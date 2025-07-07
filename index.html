@@ -145,10 +145,6 @@
             transform: rotate(-90deg);
         }
 
-        /* === NEW CSS FOR MOBILE FRIENDLINESS (Modal/Toast) === */
-        /* Removed min-height from #game-message and #advice-message for this approach */
-        /* Re-added hidden class for #advice-message in HTML */
-
         /* Modal Overlay */
         .modal-overlay {
             position: fixed;
@@ -199,43 +195,125 @@
             color: #f7fafc;
         }
 
-        /* On smaller screens, reduce font size for messages if needed */
+        /* === MOBILE-SPECIFIC VERTICAL SPACING & FONT ADJUSTMENTS === */
         @media (max-width: 768px) {
-            #game-message {
-                font-size: 1rem; /* Smaller font on mobile */
+            /* General container padding */
+            .bg-gray-800 {
+                padding: 0.75rem; /* Reduced from 1.5rem */
             }
-            /* Advice message will now be in the modal, so no direct styling here */
+
+            /* Title */
+            h1 {
+                margin-bottom: 0.75rem; /* Reduced from 1.5rem (mb-6) */
+                font-size: 2.25rem; /* Slightly smaller title */
+            }
+
+            /* Game Rules */
+            #game-rules-container {
+                margin-bottom: 0.75rem; /* Reduced from 2rem (mb-8) */
+                padding: 0.5rem; /* Reduced from 0.75rem (p-3) */
+            }
+            #game-rules-header {
+                font-size: 1rem; /* Smaller font */
+            }
+            #game-rules-content p {
+                font-size: 0.75rem; /* Smaller font */
+            }
+
+            /* Controls & Shoe Display */
+            .flex.flex-col.md\:flex-row.justify-center.md\:justify-around.items-center.gap-4.mb-6 {
+                margin-bottom: 0.75rem; /* Reduced from 1.5rem (mb-6) */
+                gap: 0.5rem; /* Reduced gap between elements */
+            }
+            .flex.flex-col.md\:flex-row > div {
+                margin-bottom: 0.4rem; /* Add some spacing between stacked elements */
+            }
+            .flex.flex-col.md\:flex-row > div:last-child {
+                margin-bottom: 0;
+            }
+            label {
+                font-size: 0.9rem; /* Smaller label font */
+            }
+            select, input[type="number"] {
+                padding: 0.3rem; /* Smaller padding for inputs/selects */
+                font-size: 0.85rem; /* Smaller font */
+            }
+            #shoe-display-container {
+                width: 200px; /* Slightly narrower shoe display */
+                height: 25px;
+            }
+            #shuffled-message {
+                font-size: 0.75rem; /* Smaller font */
+            }
+
+
+            /* Balance & Stats */
+            .text-2xl.font-bold.mb-6 {
+                margin-bottom: 0.75rem; /* Reduced from 1.5rem (mb-6) */
+                font-size: 1.25rem; /* Smaller balance font */
+            }
+            .grid.grid-cols-2.md\:grid-cols-4.gap-4.text-lg.font-semibold.mb-6.text-center {
+                margin-bottom: 0.75rem; /* Reduced from 1.5rem (mb-6) */
+                gap: 0.4rem; /* Reduced gap */
+            }
+            .grid.grid-cols-2.md\:grid-cols-4 p,
+            .grid.grid-cols-2.md\:grid-cols-4 span {
+                font-size: 0.85rem; /* Smaller text for stats */
+            }
+            .text-sm.font-semibold.leading-tight {
+                font-size: 0.75rem; /* Even smaller for running/decks remaining labels */
+            }
+            .font-bold.text-base {
+                font-size: 0.9rem; /* Smaller for running/decks remaining values */
+            }
+
+
+            /* Hands Sections */
+            .mb-8.text-center {
+                margin-bottom: 0.75rem; /* Reduced from 2rem (mb-8) */
+            }
+            h2 {
+                margin-bottom: 0.4rem; /* Reduced from 0.5rem (mb-2) */
+                font-size: 1.1rem; /* Smaller section titles */
+            }
+            .card-container {
+                min-height: 90px; /* Adjust min-height for smaller cards */
+                gap: 0.3rem; /* Reduced gap between cards */
+            }
             .card {
-                width: 60px; /* Slightly smaller cards on mobile */
-                height: 90px;
+                width: 50px; /* Smaller cards on mobile */
+                height: 75px;
+                padding: 0.25rem;
             }
             .card-value {
-                font-size: 1.2rem;
+                font-size: 1rem; /* Smaller card value font */
             }
             .card-suit-top, .card-suit-bottom {
-                font-size: 0.7rem;
+                font-size: 0.5rem; /* Smaller suit font */
             }
-        }
-        /* Adjust overall padding for very small screens if content is too cramped */
-        @media (max-width: 480px) {
-            body {
-                padding: 0.5rem;
+            .player-hand-wrapper span.text-lg.font-semibold.mb-2 {
+                font-size: 0.9rem; /* Smaller score text */
+                margin-bottom: 0.25rem;
             }
-            .bg-gray-800 {
-                padding: 0.75rem;
+            .player-hand-wrapper div.text-lg.font-bold.mt-2 {
+                font-size: 0.9rem; /* Smaller winnings text */
+                margin-top: 0.25rem;
             }
-            .text-4xl {
-                font-size: 2.5rem; /* Smaller title */
+
+            /* Game Message */
+            #game-message {
+                margin-bottom: 0.5rem; /* Reduced from 1rem (mb-4) */
+                font-size: 0.95rem; /* Smaller font on mobile */
             }
-            .text-2xl {
-                font-size: 1.5rem; /* Smaller section titles */
-            }
-            .flex-wrap {
-                justify-content: space-around; /* Distribute buttons better */
+
+            /* Buttons */
+            .flex.flex-wrap.justify-center.gap-4.mt-6 {
+                margin-top: 0.75rem; /* Reduced from 1.5rem (mt-6) */
+                gap: 0.4rem; /* Reduced gap between buttons */
             }
             button {
-                padding: 0.6rem 1rem; /* Smaller button padding */
-                font-size: 0.9rem;
+                padding: 0.4rem 0.8rem; /* Smaller button padding */
+                font-size: 0.8rem; /* Smaller button font */
             }
         }
     </style>
@@ -275,7 +353,7 @@
                 <input type="number" id="bet-amount" value="10" min="1" class="w-24 p-2 rounded-md bg-gray-700 text-white border border-gray-600 focus:outline-none focus:ring-2 focus:ring-blue-500">
             </div>
             <div class="flex flex-col items-center">
-                <p class="text-sm font-semibold mb-1">Cards Remaining:</p>
+                <p class="text-sm font-semibold mb-1">Cards Remaining in Shoe:</p>
                 <div id="shoe-display-container" class="relative">
                     <div id="shoe-visual"></div>
                     <div id="cut-card-visual"></div>
@@ -505,7 +583,9 @@
                 const data = await response.json();
                 currentGameState = data; // Update local game state
                 updateFullUI();
-            } catch (error) {
+            }
+            // Error handling for fetchGameState
+            catch (error) {
                 console.error('Error fetching game state:', error);
                 uiCtrl.displayGameMessage('Error connecting to game server. Please ensure the backend is running and Ngrok is active.', 'error');
             }
@@ -513,6 +593,7 @@
 
         async function postAction(endpoint, payload = {}) {
             try {
+                uiCtrl.clearAdvice(); // Clear advice modal before new action
                 const response = await fetch(`${BASE_URL}/${endpoint}`, {
                     method: 'POST',
                     headers: {
@@ -527,7 +608,9 @@
                 const data = await response.json();
                 currentGameState = data; // Update local game state
                 updateFullUI();
-            } catch (error) {
+            }
+            // Error handling for postAction
+            catch (error) {
                 console.error(`Error performing action ${endpoint}:`, error);
                 uiCtrl.displayGameMessage(`Error: ${error.message}. Please ensure the backend is running and Ngrok is active.`, 'error');
             }
