@@ -227,238 +227,7 @@
     </div>
 
     <script>
-    // --- MODULE PATTERN: STRATEGY CONTROLLER ---
-    const strategyController = (function() {
-        const h17PairSplittingStrategy = {
-            'A': { always: 'Split', reason: 'Always split Aces.'},
-            '10': { always: 'Stand', reason: 'Never split, hit, or double down on 10s.'},
-            '9': { splitVs: [2, 3, 4, 5, 6, 8, 9], else: 'Stand', reason: 'Split 9s vs dealer 2-6, 8-9; Stand vs 7, 10, A.'},
-            '8': { always: 'Split', reason: 'Always split 8s.'},
-            '7': { splitVs: [2, 3, 4, 5, 6, 7], else: 'Hit', reason: 'Split 7s vs dealer 2-7; Hit vs 8-A.'},
-            '6': { splitVs: [2, 3, 4, 5, 6], else: 'Hit', reason: 'Split 6s vs dealer 2-6; Hit vs 7-A.'},
-            '5': { always: 'NoSplit', reason: 'Never split 5s; treat as a hard 10.'},
-            '4': { splitVs: [5, 6], else: 'Hit', reason: 'Split 4s vs dealer 5-6; otherwise, Hit.'},
-            '3': { splitVs: [2, 3, 4, 5, 6, 7], else: 'Hit', reason: 'Split 3s vs dealer 2-7; Hit vs 8-A.'},
-            '2': { splitVs: [2, 3, 4, 5, 6, 7], else: 'Hit', reason: 'Split 2s vs dealer 2-7; otherwise, Hit.'},
-        };
-
-        const h17SoftTotalsStrategy = {
-            '20': { always: 'Stand', reason: 'Always stand on soft 20.'},
-            '19': { always: 'Stand', reason: 'Always stand on soft 19.'},
-            '18': { doubleVs: [2, 3, 4, 5, 6], standVs: [7, 8], else: 'Hit', reason: 'Double soft 18 vs 2-6; Stand vs 7-8; Hit vs 9-A.'},
-            '17': { doubleVs: [3, 4, 5, 6], else: 'Hit', reason: 'Double soft 17 vs 3-6; otherwise, Hit.'},
-            '16': { doubleVs: [4, 5, 6], else: 'Hit', reason: 'Double soft 16 vs 4-6; otherwise, Hit.'},
-            '15': { doubleVs: [4, 5, 6], else: 'Hit', reason: 'Double soft 15 vs 4-6; otherwise, Hit.'},
-            '14': { doubleVs: [5, 6], else: 'Hit', reason: 'Double soft 14 vs 5-6; otherwise, Hit.'},
-            '13': { doubleVs: [5, 6], else: 'Hit', reason: 'Double soft 13 vs 5-6; otherwise, Hit.'},
-        };
-
-        const h17HardTotalsStrategy = {
-            '17': { always: 'Stand', reason: 'Always stand on hard 17+.'},
-            '16': { standVs: [2, 3, 4, 5, 6], else: 'Hit', reason: 'Stand on hard 16 vs 2-6; Hit vs 7-A.' },
-            '15': { standVs: [2, 3, 4, 5, 6], else: 'Hit', reason: 'Stand on hard 15 vs 2-6; Hit vs 7-A.' },
-            '14': { standVs: [2, 3, 4, 5, 6], else: 'Hit', reason: 'Stand on hard 14 vs 2-6; Hit vs 7-A.' },
-            '13': { standVs: [2, 3, 4, 5, 6], else: 'Hit', reason: 'Stand on hard 13 vs 2-6; Hit vs 2-3, 7-A.' },
-            '12': { standVs: [4, 5, 6], else: 'Hit', reason: 'Stand on hard 12 vs 4-6; Hit vs 2-3, 7-A.' },
-            '11': { always: 'Double', reason: 'Always double on hard 11.'},
-            '10': { doubleVs: [2, 3, 4, 5, 6, 7, 8, 9], else: 'Hit', reason: 'Double on 10 vs 2-9; Hit vs 10, A.'},
-            '9': { doubleVs: [3, 4, 5, 6], else: 'Hit', reason: 'Double on 9 vs dealer 3-6; otherwise, Hit.'},
-        };
-
-        return {
-            getTables: function(gameConfig) {
-                if (gameConfig.dealerHitsOnSoft17) {
-                    return {
-                        pairs: h17PairSplittingStrategy,
-                        soft: h17SoftTotalsStrategy,
-                        hard: h17HardTotalsStrategy
-                    };
-                } 
-            },
-            // This function is still needed on the frontend to determine advice
-            calculateScore: function(handCards) {
-                let score = 0;
-                let numAces = 0;
-                for (let card of handCards) {
-                    if (card.value === 'A') {
-                        numAces++;
-                        score += 11;
-                    } else if (['K', 'Q', 'J'].includes(card.value)) {
-                        score += 10;
-                    } else {
-                        score += parseInt(card.value);
-                    }
-                }
-                while (score > 21 && numAces > 0) {
-                    score -= 10;
-                    numAces--;
-                }
-                return score;
-            },
-            // This function is still needed on the frontend for advice
-            getBasicStrategyAdvice: function(playerHandCards, dealerUpCard, canDoubleOrSplit, gameConfig) {
-                // Ensure playerHandCards is an array and has elements
-                if (!Array.isArray(playerHandCards) || playerHandCards.length === 0) {
-                    return { action: 'No Advice', reason: 'Invalid player hand for strategy advice.' };
-                }
-
-                const playerScore = this.calculateScore(playerHandCards);
-                const dealerValue = (dealerUpCard.value === 'A') ? 11 : (['K', 'Q', 'J'].includes(dealerUpCard.value) ? 10 : parseInt(dealerUpCard.value));
-                
-                const isPair = canDoubleOrSplit && playerHandCards[0].value === playerHandCards[1].value;
-                const hasAce = playerHandCards.some(card => card.value === 'A');
-                // Calculate soft score correctly: sum of non-aces + 11 (for one ace)
-                const isSoft = hasAce && (this.calculateScore(playerHandCards.filter(c => c.value !== 'A')) + 11) === playerScore;
-
-                const tables = this.getTables(gameConfig);
-                let strat, pVal, scoreKey;
-
-                if (isPair) {
-                    pVal = ['J', 'Q', 'K'].includes(playerHandCards[0].value) ? '10' : playerHandCards[0].value;
-                    strat = tables.pairs[pVal];
-                    
-                    if (strat.always) {
-                        if (strat.always === 'NoSplit') { /* falls through to hard total logic */ } 
-                        else { return { action: strat.always, reason: strat.reason }; }
-                    } else if (strat.splitVs.includes(dealerValue)) {
-                        return { action: 'Split', reason: strat.reason };
-                    } else {
-                        // If not splitting, the 'else' action (Hit/Stand) is usually for the resulting hard total.
-                        // We need to re-evaluate as a hard hand if 'NoSplit' was the advice.
-                        // For other 'else' cases, the strategy table already provides the action.
-                        return { action: strat.else, reason: strat.reason };
-                    }
-                }
-
-                if (isSoft) {
-                    strat = tables.soft[playerScore];
-                    if (strat) {
-                        if (strat.always) return { action: strat.always, reason: strat.reason };
-                        
-                        if (strat.doubleVs && strat.doubleVs.includes(dealerValue)) {
-                            if (canDoubleOrSplit) {
-                                return { action: 'Double', reason: strat.reason };
-                            } else {
-                                return { action: 'Hit', reason: 'Hit a multi-card soft hand.' };
-                            }
-                        }
-                        if (strat.standVs && strat.standVs.includes(dealerValue)) {
-                            return { action: 'Stand', reason: strat.reason };
-                        }
-                        return { action: strat.else, reason: strat.reason };
-                    }
-                }
-
-                scoreKey = playerScore >= 17 ? '17' : (playerScore <= 8 ? '8' : playerScore.toString());
-                strat = tables.hard[scoreKey];
-                if (strat) {
-                    if (strat.always) {
-                        if (strat.always === 'Double') {
-                            if (canDoubleOrSplit) {
-                                return { action: 'Double', reason: strat.reason };
-                            } else {
-                                return { action: 'Hit', reason: 'Hit a multi-card hard hand.' };
-                            }
-                        }
-                        return { action: strat.always, reason: strat.reason };
-                    }
-                    
-                    if (strat.doubleVs) {
-                        if (strat.doubleVs.includes(dealerValue)) {
-                            if (canDoubleOrSplit) {
-                                return { action: 'Double', reason: strat.reason };
-                            } else {
-                                return { action: 'Hit', reason: 'Hit a multi-card hard hand.' };
-                            }
-                        } else {
-                             return { action: strat.else, reason: strat.reason };
-                        }
-                    }
-                    
-                    if (strat.standVs) {
-                        if (strat.standVs.includes(dealerValue)) {
-                            return { action: 'Stand', reason: strat.reason };
-                        } else {
-                            return { action: strat.else, reason: strat.reason };
-                        }
-                    }
-                }
-
-                return { action: 'Hit', reason: `Always hit on a hard total of ${playerScore}.` };
-            }
-        };
-    })();
-
-
-    // --- MODULE PATTERN: GAME LOGIC (FRONTEND PART) ---
-    // This module will now primarily manage the frontend's representation of the game state
-    // and provide helper functions that don't require backend authority.
-    const gameController = (function() {
-
-        // --- CENTRAL GAME STATE (FRONTEND REPRESENTATION) ---
-        // This will be updated by responses from the backend
-        let gameState = {
-            round: {
-                gameId: null, // New: To store the ID of the game session on the backend
-                playerHands: [],
-                dealerHand: { cards: [], upCardScore: 0, score: 0 }, // Added score for dealer
-                currentHandIndex: 0,
-                isOver: true,
-                betAmount: 10
-            },
-            player: {
-                totalBalance: 0,
-                stats: { handsPlayed: 0, handsWon: 0, strategyOpportunities: 0, strategyCorrect: 0 }
-            },
-            shoe: {
-                size: 6, totalCards: 0, cardsDealt: 0, cutCardPosition: 0, showShuffledMessage: false,
-            },
-            counts: { running: 0, true: 0, decksRemaining: 0 },
-            gameConfig: { // Frontend's understanding of game rules (for strategy advice)
-                dealerHitsOnSoft17: true,
-                blackjackPayout: 1.5,
-                maxHandsAfterSplitting: 4,
-            }
-        };
-
-        // --- PUBLIC API ---
-        return {
-            getGameState: function() {
-                return gameState;
-            },
-            // This function will now update the frontend's gameState based on backend responses
-            updateGameStateFromBackend: function(backendState) {
-                // Update round data
-                gameState.round.gameId = backendState.gameId;
-                gameState.round.playerHands = backendState.playerHands;
-                gameState.round.dealerHand = backendState.dealerHand;
-                gameState.round.currentHandIndex = backendState.currentHandIndex; // Backend now controls this
-                gameState.round.isOver = backendState.isOver;
-                gameState.round.betAmount = backendState.playerHands[0] ? backendState.playerHands[0].bet : gameState.round.betAmount;
-
-                // Update counts
-                gameState.counts = backendState.counts;
-                
-                // Update shoe info
-                gameState.shoe = backendState.shoe;
-
-                // Update player stats and balance (if backend sends it, otherwise manage here)
-                // For this example, we'll keep stats/balance updates in appController after round ends.
-            },
-            // The following functions are no longer authoritative, but might be used for UI display or strategy advice
-            // calculateScore: function(handCards) { /* ... strategyCtrl has it */ },
-            // updateRunningCount: function(card) { /* ... backend handles this */ },
-            // getInitialState: function() { /* ... frontend will initialize its own state */ },
-            // setInitialState: function() { /* ... frontend will initialize its own state */ },
-            // reshuffleShoe: function() { /* ... backend handles this */ },
-            // dealCard: function() { /* ... backend handles this */ },
-            // determineGameResults: function() { /* ... backend handles this */ }
-        };
-    })();
-
-
     // --- MODULE PATTERN: UI CONTROLLER ---
-    // This module remains largely the same, as its job is to render the UI based on the current frontend state.
     const uiController = (function() {
         
         const DOMstrings = {
@@ -528,8 +297,12 @@
             const cardsContainer = document.createElement('div');
             cardsContainer.className = 'card-container justify-center';
             hand.cards.forEach(card => {
-                // Ensure initialHandForStrategy exists and contains the card for highlighting
-                const isHighlighted = hand.initialHandForStrategy && hand.initialHandForStrategy.some(c => c.value === card.value && c.suit === card.suit);
+                // For initialHandForStrategy, we need to compare card objects.
+                // Since they come from the backend, they are new objects.
+                // We'll highlight based on if their value/suit matches the initial hand.
+                const isHighlighted = hand.initialHandForStrategy.some(initialCard => 
+                    initialCard.value === card.value && initialCard.suit === card.suit
+                );
                 cardsContainer.appendChild(renderCard(card, false, isHighlighted));
             });
 
@@ -562,7 +335,7 @@
             renderDealerHand: function(dealerHand, isGameOver) {
                 const container = document.querySelector(DOMstrings.dealerHandDiv);
                 container.innerHTML = '';
-                dealerHand.cards.forEach((card, index) => {
+                dealerHand.forEach((card, index) => {
                     const isHidden = !isGameOver && index === 1;
                     const isHighlighted = index === 0;
                     container.appendChild(renderCard(card, isHidden, isHighlighted));
@@ -570,9 +343,14 @@
             },
 
             updateScores: function(gameState) {
-                // Dealer's score display now comes from backend's upCardScore or full score
-                const score = gameState.round.isOver ? gameState.round.dealerHand.score : gameState.round.dealerHand.upCardScore;
-                document.querySelector(DOMstrings.dealerScoreSpan).textContent = score;
+                // Dealer score calculation is now done on the backend
+                const dealerUpCardScore = (gameState.round.dealerHand && gameState.round.dealerHand.length > 0) ? 
+                                          (gameState.round.dealerHand[0].value === 'A' ? 11 : 
+                                           (['K', 'Q', 'J'].includes(gameState.round.dealerHand[0].value) ? 10 : 
+                                            parseInt(gameState.round.dealerHand[0].value))) : 0;
+
+                const scoreText = gameState.round.isOver ? gameState.round.dealerScore : dealerUpCardScore;
+                document.querySelector(DOMstrings.dealerScoreSpan).textContent = scoreText;
             },
 
             updateActionButtons: function(gameState) {
@@ -598,15 +376,15 @@
                 enable(DOMstrings.hitButton);
                 enable(DOMstrings.standButton);
                 
-                // Frontend needs to know gameConfig for these checks
-                const gameConfig = gameState.gameConfig; 
-
-                if (currentHand.cards.length === 2 && !currentHand.isSplitAce && gameConfig.maxHandsAfterSplitting > gameState.round.playerHands.length) enable(DOMstrings.doubleButton);
+                // Check if double is allowed (only on initial 2 cards, not split aces)
+                if (currentHand.cards.length === 2 && !currentHand.isSplitAce) enable(DOMstrings.doubleButton);
                 else disable(DOMstrings.doubleButton);
 
-                if (currentHand.cards.length === 2 && currentHand.cards[0].value === currentHand.cards[1].value && gameState.round.playerHands.length < gameConfig.maxHandsAfterSplitting) enable(DOMstrings.splitButton);
+                // Check if split is allowed (only on initial 2 cards, matching values, and max hands not reached)
+                if (currentHand.cards.length === 2 && currentHand.cards[0].value === currentHand.cards[1].value && gameState.round.playerHands.length < gameState.gameConfig.maxHandsAfterSplitting) enable(DOMstrings.splitButton);
                 else disable(DOMstrings.splitButton);
 
+                // Special case for split aces: after one card, they stand automatically
                 if (currentHand.isSplitAce && currentHand.cards.length === 2 && !currentHand.isActive) {
                     disable(DOMstrings.hitButton); disable(DOMstrings.standButton); disable(DOMstrings.doubleButton);
                 }
@@ -617,10 +395,10 @@
                 const wonPct = handsPlayed > 0 ? ((handsWon / handsPlayed) * 100).toFixed(1) : 0;
                 const correctPct = strategyOpportunities > 0 ? ((strategyCorrect / strategyOpportunities) * 100).toFixed(1) : 0;
                 document.querySelector(DOMstrings.handsWonDisplay).textContent = `Hands Won: ${handsWon} / ${handsPlayed} (${wonPct}%)`;
-                document.querySelector(DOMstrings.strategyCorrectDisplay).textContent = `Strategy Correct: ${correctPct} / ${strategyOpportunities} (${correctPct}%)`;
+                document.querySelector(DOMstrings.strategyCorrectDisplay).textContent = `Strategy Correct: ${strategyCorrect} / ${strategyOpportunities} (${correctPct}%)`;
             },
 
-            updateCardCountingDisplays: function(counts) {
+            updateCardCountingDisplays: function(counts, shoe) {
                 document.querySelector(DOMstrings.runningCountDisplay).textContent = counts.running;
                 document.querySelector(DOMstrings.decksRemainingDisplay).textContent = counts.decksRemaining.toFixed(1);
                 document.querySelector(DOMstrings.trueCountDisplay).textContent = counts.true.toFixed(1);
@@ -670,7 +448,7 @@
                 else if (type === 'push') el.classList.add('text-blue-500');
             },
 
-            displayAdvice: function(message, type = 'neutral') {
+            displayAdvice: function(advice) {
                 const el = document.querySelector(DOMstrings.adviceMessageDiv);
                 const baseClasses = 'p-4 mt-4 rounded-lg text-center font-bold text-lg';
                 const typeClasses = {
@@ -678,8 +456,8 @@
                     incorrect: 'bg-red-700',
                     neutral: 'bg-blue-700'
                 };
-                el.className = `${baseClasses} ${typeClasses[type]}`;
-                el.innerHTML = message;
+                el.className = `${baseClasses} ${typeClasses[advice.type]}`;
+                el.innerHTML = advice.text;
                 el.classList.remove('hidden');
             },
 
@@ -693,393 +471,107 @@
 
 
     // --- MODULE PATTERN: APP CONTROLLER ---
-    const appController = (function(gameCtrl, uiCtrl, strategyCtrl) { // Added strategyCtrl to params
+    const appController = (function(uiCtrl) {
 
         const DOM = uiCtrl.getDOMstrings();
-        const BACKEND_URL = 'http://localhost:3000'; // Your local backend server URL
+        const BASE_URL = 'http://127.0.0.1:5000'; // Flask backend URL
 
-        // Frontend's internal game state, updated by backend responses
-        let currentFrontendGameState = gameCtrl.getGameState();
+        let currentGameState = {}; // Store the current game state fetched from backend
+
+        async function fetchGameState() {
+            try {
+                const response = await fetch(`${BASE_URL}/game_state`);
+                if (!response.ok) {
+                    throw new Error(`HTTP error! status: ${response.status}`);
+                }
+                const data = await response.json();
+                currentGameState = data; // Update local game state
+                updateFullUI();
+            } catch (error) {
+                console.error('Error fetching game state:', error);
+                uiCtrl.displayGameMessage('Error connecting to game server. Please ensure the backend is running.', 'error');
+            }
+        }
+
+        async function postAction(endpoint, payload = {}) {
+            try {
+                const response = await fetch(`${BASE_URL}/${endpoint}`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify(payload)
+                });
+                if (!response.ok) {
+                    const errorData = await response.json();
+                    throw new Error(`HTTP error! status: ${response.status}, message: ${errorData.message || 'Unknown error'}`);
+                }
+                const data = await response.json();
+                currentGameState = data; // Update local game state
+                updateFullUI();
+            } catch (error) {
+                console.error(`Error performing action ${endpoint}:`, error);
+                uiCtrl.displayGameMessage(`Error: ${error.message}`, 'error');
+            }
+        }
 
         function setupEventListeners() {
-            document.querySelector(DOM.dealButton).addEventListener('click', ctrlDealNewHand);
-            document.querySelector(DOM.hitButton).addEventListener('click', () => ctrlPlayerAction('hit'));
-            document.querySelector(DOM.standButton).addEventListener('click', () => ctrlPlayerAction('stand'));
-            document.querySelector(DOM.doubleButton).addEventListener('click', () => ctrlPlayerAction('double'));
-            document.querySelector(DOM.splitButton).addEventListener('click', () => ctrlPlayerAction('split'));
-            document.querySelector(DOM.shoeSizeSelect).addEventListener('change', ctrlResetGame);
+            document.querySelector(DOM.dealButton).addEventListener('click', () => postAction('deal', { betAmount: parseInt(document.querySelector(DOM.betAmountInput).value) }));
+            document.querySelector(DOM.hitButton).addEventListener('click', () => postAction('hit'));
+            document.querySelector(DOM.standButton).addEventListener('click', () => postAction('stand'));
+            document.querySelector(DOM.doubleButton).addEventListener('click', () => postAction('double'));
+            document.querySelector(DOM.splitButton).addEventListener('click', () => postAction('split'));
+            
+            document.querySelector(DOM.shoeSizeSelect).addEventListener('change', async (event) => {
+                const newShoeSize = parseInt(event.target.value);
+                await postAction('set_shoe_size', { shoeSize: newShoeSize });
+            });
+            document.querySelector(DOM.betAmountInput).addEventListener('change', async (event) => {
+                const newBetAmount = parseInt(event.target.value);
+                await postAction('set_bet_amount', { betAmount: newBetAmount });
+            });
+
             document.querySelector(DOM.gameRulesHeader).addEventListener('click', () => {
                 document.querySelector(DOM.gameRulesContainer).classList.toggle('collapsed');
             });
         }
 
-        // This function updates the UI based on the currentFrontendGameState
         function updateFullUI() {
-            uiCtrl.renderAllPlayerHands(currentFrontendGameState);
-            uiCtrl.renderDealerHand(currentFrontendGameState.round.dealerHand, currentFrontendGameState.round.isOver);
-            uiCtrl.updateScores(currentFrontendGameState);
-            uiCtrl.updateStatisticsDisplay(currentFrontendGameState.player.stats);
-            uiCtrl.updateCardCountingDisplays(currentFrontendGameState.counts);
-            uiCtrl.updateBalanceDisplay(currentFrontendGameState.player.totalBalance);
-            uiCtrl.updateActionButtons(currentFrontendGameState);
-            uiCtrl.updateShoeVisual(currentFrontendGameState.shoe);
-            uiCtrl.updateShuffledMessageDisplay(currentFrontendGameState.shoe.showShuffledMessage); // Show shuffle message if backend indicates
-        }
-
-        // --- Frontend functions that now call the Backend ---
-
-        async function ctrlDealNewHand() {
-            const betAmount = parseInt(document.querySelector(DOM.betAmountInput).value);
-            const shoeSize = parseInt(document.querySelector(DOM.shoeSizeSelect).value);
-            if (isNaN(betAmount) || betAmount <= 0) {
-                uiCtrl.displayGameMessage("Please enter a valid bet amount.", "info");
+            // Ensure currentGameState is populated before rendering
+            if (!currentGameState || Object.keys(currentGameState).length === 0) {
+                console.warn("Game state not yet loaded or is empty.");
                 return;
             }
 
-            uiCtrl.clearAdvice();
-            uiCtrl.displayGameMessage("Dealing new hand..."); // Show loading message
-
-            try {
-                const response = await fetch(`${BACKEND_URL}/api/game/new`, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ betAmount: betAmount, shoeSize: shoeSize })
-                });
-
-                const data = await response.json();
-
-                if (data.success) {
-                    // Update the frontend's game state with data from the backend
-                    gameCtrl.updateGameStateFromBackend(data.gameState);
-                    
-                    // Update player stats and balance for the frontend's display (backend is authoritative)
-                    // For a new game, reset stats and add bet to balance
-                    currentFrontendGameState.player.stats = { handsPlayed: 0, handsWon: 0, strategyOpportunities: 0, strategyCorrect: 0 };
-                    currentFrontendGameState.player.totalBalance -= betAmount; // Deduct initial bet
-
-                    // Handle immediate game outcomes (Blackjack)
-                    const playerHand = currentFrontendGameState.round.playerHands[0];
-                    const dealerHadBlackjack = currentFrontendGameState.round.dealerHadBlackjack; // From backend state
-
-                    if (playerHand.isBlackjack && dealerHadBlackjack) {
-                        uiCtrl.displayGameMessage(`Push! Both have Natural Blackjack.`, "push");
-                        currentFrontendGameState.player.totalBalance += playerHand.bet; // Return bet for push
-                    } else if (playerHand.isBlackjack) {
-                        uiCtrl.displayGameMessage(`Natural Blackjack! You win!`, "win");
-                        currentFrontendGameState.player.totalBalance += playerHand.winnings; // Add winnings
-                    } else if (dealerHadBlackjack) {
-                        uiCtrl.displayGameMessage(`Dealer has Natural Blackjack. You lose.`, "lose");
-                        // Winnings already deducted by bet
-                    } else if (playerHand.score === 21 && playerHand.cards.length > 2) {
-                        // Player has 21 but not blackjack (e.g., hit to 21 or split)
-                        uiCtrl.displayGameMessage(`Hand ${currentFrontendGameState.round.currentHandIndex + 1}: You have 21! Automatically standing.`, "info");
-                        // This case should already be handled by backend setting isActive to false
-                        // If all hands are now inactive, trigger dealer turn
-                        if (currentFrontendGameState.round.playerHands.every(hand => !hand.isActive)) {
-                            await ctrlDealerTurn();
-                        }
-                    } else {
-                        uiCtrl.displayGameMessage("Your turn. What's your move?");
-                    }
-
-                    // Evaluate strategy advice for the initial deal (bug fix: not an incorrect play)
-                    // Only evaluate if the game is not immediately over due to blackjacks
-                    if (!currentFrontendGameState.round.isOver) {
-                        evaluatePlayerAction(playerHand, currentFrontendGameState.round.dealerHand.cards[0], 'Initial Deal');
-                    } else {
-                        // If game is over immediately, clear advice or give specific message
-                        uiCtrl.clearAdvice();
-                    }
-
-
-                } else {
-                    uiCtrl.displayGameMessage(data.message || "Failed to deal new hand.", "error");
-                }
-            } catch (error) {
-                console.error('Error dealing new hand:', error);
-                uiCtrl.displayGameMessage("Could not connect to backend. Is your server running?", "error");
-            } finally {
-                updateFullUI(); // Always update UI after attempt
-            }
-        }
-
-        // Generic function to send player actions to the backend
-        async function ctrlPlayerAction(actionType) {
-            const gameId = currentFrontendGameState.round.gameId;
-            const currentHandIndex = currentFrontendGameState.round.currentHandIndex; // Corrected access path
-            
-            if (!gameId) {
-                uiCtrl.displayGameMessage("Please start a new game first.", "info");
-                return;
-            }
-
-            const currentHand = currentFrontendGameState.round.playerHands[currentHandIndex];
-            if (!currentHand || !currentHand.isActive || currentFrontendGameState.round.isOver) return;
-
-            // Evaluate strategy BEFORE sending to backend, as advice is frontend-only
-            evaluatePlayerAction(currentHand, currentFrontendGameState.round.dealerHand.cards[0], actionType);
-
-            uiCtrl.displayGameMessage(`Processing ${actionType}...`);
-
-            try {
-                const response = await fetch(`${BACKEND_URL}/api/game/${gameId}/action`, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ actionType: actionType, handIndex: currentHandIndex })
-                });
-
-                const data = await response.json();
-
-                if (data.success) {
-                    // Update frontend state with the authoritative state from backend
-                    gameCtrl.updateGameStateFromBackend(data.gameState);
-                    
-                    // Determine next step based on backend's state
-                    const updatedHand = currentFrontendGameState.round.playerHands[currentFrontendGameState.round.currentHandIndex]; // Re-fetch updated hand
-
-                    if (!updatedHand.isActive || updatedHand.score >= 21) {
-                        // If current hand is finished (busted, stood, 21, doubled), try to move to next hand
-                        let foundNextHand = false;
-                        let nextIndex = -1;
-
-                        // First, try to find an active hand *after* the current one
-                        for (let i = currentFrontendGameState.round.currentHandIndex + 1; i < currentFrontendGameState.round.playerHands.length; i++) {
-                            if (currentFrontendGameState.round.playerHands[i].isActive) {
-                                nextIndex = i;
-                                foundNextHand = true;
-                                break;
-                            }
-                        }
-                        // If no active hand found after current, check from the beginning of the hands array
-                        if (!foundNextHand) {
-                            for (let i = 0; i < currentFrontendGameState.round.playerHands.length; i++) {
-                                if (currentFrontendGameState.round.playerHands[i].isActive) {
-                                    nextIndex = i;
-                                    foundNextHand = true;
-                                    break;
-                                }
-                            }
-                        }
-
-                        if (foundNextHand) {
-                            currentFrontendGameState.round.currentHandIndex = nextIndex; // Update frontend's current hand index
-                            uiCtrl.displayGameMessage(`Playing Hand ${currentFrontendGameState.round.currentHandIndex + 1}. What's your move?`);
-                        } else { // No more active player hands, trigger dealer's turn
-                            await ctrlDealerTurn();
-                        }
-                    } else {
-                        uiCtrl.displayGameMessage("Your turn. What's your move?");
-                    }
-
-                } else {
-                    uiCtrl.displayGameMessage(data.message || `Failed to perform ${actionType}.`, "error");
-                }
-            } catch (error) {
-                console.error(`Error performing ${actionType}:`, error);
-                uiCtrl.displayGameMessage("Could not connect to backend. Is your server running?", "error");
-            } finally {
-                updateFullUI();
-            }
-        }
-
-        async function ctrlDealerTurn() {
-            const gameId = currentFrontendGameState.round.gameId;
-            if (!gameId) return;
-
-            uiCtrl.displayGameMessage("Dealer's turn...");
-
-            try {
-                const response = await fetch(`${BACKEND_URL}/api/game/${gameId}/dealer-turn`, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({}) // No specific data needed for dealer turn
-                });
-
-                const data = await response.json();
-
-                if (data.success) {
-                    gameCtrl.updateGameStateFromBackend(data.gameState);
-                    
-                    // Update frontend player stats and total balance based on backend results
-                    // Ensure these are incremented, not overwritten, if multiple hands are played
-                    currentFrontendGameState.player.stats.handsPlayed += data.gameState.playerHands.length; 
-                    data.gameState.playerHands.forEach(hand => {
-                        if (hand.outcome === 'win') {
-                            currentFrontendGameState.player.stats.handsWon++;
-                        }
-                        currentFrontendGameState.player.totalBalance += hand.winnings; 
-                    });
-
-                    // Display overall round message
-                    let overallMsg = "";
-                    data.gameState.playerHands.forEach((hand, index) => {
-                        if (hand.outcome === 'win') overallMsg += `Hand ${index + 1}: Win! `;
-                        else if (hand.outcome === 'lose') overallMsg += `Hand ${index + 1}: Lose. `;
-                        else overallMsg += `Hand ${index + 1}: Push. `;
-                    });
-                    uiCtrl.displayGameMessage(overallMsg);
-
-                } else {
-                    uiCtrl.displayGameMessage(data.message || "Failed to complete dealer turn.", "error");
-                }
-            } catch (error) {
-                console.error('Error during dealer turn:', error);
-                uiCtrl.displayGameMessage("Could not connect to backend for dealer turn.", "error");
-            } finally {
-                updateFullUI();
-            }
-        }
-
-        function ctrlResetGame() {
-            // Reset frontend UI state and stats (backend will reset its state on next /api/game/new)
-            currentFrontendGameState = gameCtrl.getGameState(); // Re-initialize frontend state
-            uiCtrl.renderInitialShoe(currentFrontendGameState.shoe); // Render initial shoe visual
-            updateFullUI();
-            uiCtrl.displayGameMessage("Place your bet and click 'Deal New Hand' to start.");
-            uiCtrl.clearAdvice();
-        }
-
-        // This function provides strategy advice and updates frontend stats for correctness.
-        // It does NOT affect the backend game state.
-        function evaluatePlayerAction(playerHand, dealerUpCard, playerAction) {
-            // Only evaluate if it's a real player action, not the initial deal.
-            if (playerAction === 'Initial Deal') {
-                // For initial deal, just check for blackjacks and don't count as strategy opportunity
-                if (playerHand.isBlackjack || currentFrontendGameState.round.dealerHadBlackjack) {
-                    // Already handled messages in ctrlDealNewHand
-                    return;
-                }
-                // If it's a 21 on initial deal but not BJ, it's auto-stand, so count as correct strategy
-                if (playerHand.score === 21 && playerHand.cards.length === 2 && !playerHand.isBlackjack) {
-                    currentFrontendGameState.player.stats.strategyOpportunities++;
-                    currentFrontendGameState.player.stats.strategyCorrect++;
-                    uiCtrl.displayAdvice(`Basic Strategy: <span class="advice-text-correct">Correct!</span> You have 21, automatically standing.`, 'correct');
-                }
-                return;
-            }
-
-            // For actual player actions (Hit, Stand, Double, Split)
-            const gameConfig = currentFrontendGameState.gameConfig;
-            if (playerHand.isBlackjack || currentFrontendGameState.round.dealerHadBlackjack || (playerHand.score === 21 && playerHand.cards.length > 2 && playerAction !== 'split')) {
-                // Don't evaluate if game is already decided or hand is auto-stood (unless splitting)
-                return;
-            }
-
-            currentFrontendGameState.player.stats.strategyOpportunities++;
-            const canDoubleOrSplit = playerHand.cards.length === 2;
-            
-            const recommended = strategyCtrl.getBasicStrategyAdvice(playerHand.cards, dealerUpCard, canDoubleOrSplit, gameConfig);
-
-            if (playerAction.toLowerCase() === recommended.action.toLowerCase()) {
-                currentFrontendGameState.player.stats.strategyCorrect++;
-                uiCtrl.displayAdvice(`Basic Strategy: <span class="advice-text-correct">Correct!</span> ${recommended.reason}`, 'correct');
+            uiCtrl.renderAllPlayerHands(currentGameState);
+            uiCtrl.renderDealerHand(currentGameState.round.dealerHand, currentGameState.round.isOver);
+            uiCtrl.updateScores(currentGameState);
+            uiCtrl.updateStatisticsDisplay(currentGameState.player.stats);
+            uiCtrl.updateCardCountingDisplays(currentGameState.counts, currentGameState.shoe);
+            uiCtrl.updateBalanceDisplay(currentGameState.player.totalBalance);
+            uiCtrl.updateActionButtons(currentGameState);
+            uiCtrl.updateShoeVisual(currentGameState.shoe);
+            uiCtrl.displayGameMessage(currentGameState.ui.message);
+            if (currentGameState.ui.advice && currentGameState.ui.advice.text) {
+                uiCtrl.displayAdvice(currentGameState.ui.advice);
             } else {
-                const enhancedReason = generateEnhancedReason(recommended, playerAction, playerHand, dealerUpCard, gameConfig);
-                uiCtrl.displayAdvice(`Basic Strategy: <span class="advice-text-incorrect">Incorrect!</span> You chose ${playerAction}. Optimal was ${recommended.action}.<br>Reason: ${enhancedReason}`, 'incorrect');
+                uiCtrl.clearAdvice();
             }
-        }
-
-        // This function remains on the frontend to provide detailed reasons for strategy advice.
-        // It has been updated to match the logic from your provided index.html file.
-        function generateEnhancedReason(recommended, incorrectAction, playerHand, dealerUpCard, gameConfig) {
-            const playerScore = strategyCtrl.calculateScore(playerHand.cards);
-            const dealerValue = (dealerUpCard.value === 'A') ? 11 : (['K', 'Q', 'J'].includes(dealerUpCard.value) ? 10 : parseInt(dealerUpCard.value));
-            const isSoft = playerHand.cards.some(c => c.value === 'A') && (strategyCtrl.calculateScore(playerHand.cards.filter(c => c.value !== 'A')) + 11) === playerScore;
-            const isPair = playerHand.cards.length === 2 && playerHand.cards[0].value === playerHand.cards[1].value;
-            const pVal = isPair ? playerHand.cards[0].value : null;
-
-            let reason = `<strong>${recommended.reason}</strong> `;
-
-            if (pVal === 'A' && incorrectAction === 'Hit' && recommended.action === 'Split') {
-                reason += `You should always Split Aces. This gives you two strong chances at Blackjack.`;
-            } else if (pVal === 'A' && incorrectAction === 'Stand' && recommended.action === 'Split') {
-                reason += `You should always Split Aces. Standing on a soft 12 or 2 is a very weak position.`;
-            } else if (pVal === 'A' && incorrectAction === 'Double' && recommended.action === 'Split') {
-                reason += `You should always Split Aces. Doubling on a soft 12 is a poor play.`;
-            } else if (pVal === '10' && incorrectAction === 'Split' && recommended.action === 'Stand') {
-                reason += `Never split 10s. You already have a strong hand of 20. Splitting would likely weaken your position.`;
-            } else if (pVal === '10' && incorrectAction === 'Hit' && recommended.action === 'Stand') {
-                reason += `Never hit a hard 20. You already have a winning hand.`;
-            } else if (pVal === '10' && incorrectAction === 'Double' && recommended.action === 'Stand') {
-                reason += `Never double a hard 20. You already have a winning hand.`;
-            } else if (pVal === '9' && incorrectAction === 'Hit' && recommended.action === 'Split') {
-                reason += `While hitting a hard 18 is safe, the dealer's ${dealerValue} is a weak position. Splitting is a better play here, giving you two separate chances to beat them.`;
-            } else if (pVal === '9' && incorrectAction === 'Stand' && recommended.action === 'Split') {
-                reason += `While standing on a hard 18 is safe, the dealer's ${dealerValue} is a weak position. Splitting is a better play here, giving you two separate chances to beat them.`;
-            } else if (pVal === '9' && incorrectAction === 'Double' && recommended.action === 'Split') {
-                reason += `You should Split 9s against a dealer's ${dealerValue} to maximize your chances. Doubling on 18 is not optimal.`;
-            } else if (pVal === '9' && incorrectAction === 'Split' && recommended.action === 'Stand') {
-                reason += `You should Stand on 18 against a dealer's ${dealerValue}. Splitting 9s against a strong dealer card (7, 10, A) is not recommended.`;
-            } else if (pVal === '8' && incorrectAction !== 'Split') {
-                reason += `A hard 16 (two 8s) is the worst possible hand. By Splitting, you break it up and start two new, more promising hands with a base of 8.`;
-            } else if (pVal === '7' && incorrectAction === 'Split' && recommended.action === 'Hit') {
-                reason += `Don't split 7s against a strong dealer up-card (8+). You would turn one weak hand (14) into two even weaker ones.`;
-            } else if (pVal === '7' && incorrectAction === 'Hit' && recommended.action === 'Split') {
-                reason += `While hitting a hard 14 is an option, the dealer's ${dealerValue} is a weak position. Splitting is a better play here, giving you two separate chances to beat them.`;
-            } else if (pVal === '6' && incorrectAction === 'Split' && recommended.action === 'Hit') {
-                reason += `Don't split 6s against a strong dealer up-card (7+). You would turn one weak hand (12) into two even weaker ones.`;
-            } else if (pVal === '6' && incorrectAction === 'Hit' && recommended.action === 'Split') {
-                 reason += `While hitting a hard 12 is an option, the dealer's ${dealerValue} is a weak position. Splitting is a better play here, giving you two separate chances to beat them.`;
-            } else if (pVal === '5' && incorrectAction === 'Split') {
-                reason = `<strong>${recommended.reason}</strong> A pair of 5s makes a hard 10, which is one of the best starting hands. Splitting wastes this powerful opportunity by turning it into two very weak hands starting with 5. You should have treated it as a 10 and either Doubled (vs dealer 2-9) or Hit (vs dealer 10/Ace).`;
-            } else if (pVal === '4' && incorrectAction === 'Split' && recommended.action === 'Hit') {
-                reason += `Splitting is too risky here. You would be creating two very weak hands (starting with 4) against a dealer who is not in a bust-prone position. The correct defensive play is to Hit.`;
-            } else if (pVal === '4' && incorrectAction === 'Hit' && recommended.action === 'Split') {
-                reason += `While hitting an 8 is safe, the dealer is in their weakest position when showing a ${dealerValue}. This is the one time it is profitable to be aggressive and Split your 4s.`;
-            } else if (pVal === '3' && incorrectAction === 'Split' && recommended.action === 'Hit') {
-                reason += `Splitting is too risky here. You would be creating two very weak hands (starting with 3) against a dealer's strong ${dealerValue}. The correct defensive play is to Hit.`;
-            } else if (pVal === '3' && incorrectAction === 'Hit' && recommended.action === 'Split') {
-                reason += `While hitting a hard 6 is safe, the dealer's ${dealerValue} is a weak position. Splitting is a better play here, giving you two separate chances to beat them.`;
-            } else if (pVal === '2' && incorrectAction === 'Split' && recommended.action === 'Hit') {
-                reason += `Splitting is too risky here. You would be creating two very weak hands (starting with 2) against a dealer's strong ${dealerValue}. The correct defensive play is to Hit.`;
-            } else if (pVal === '2' && incorrectAction === 'Hit' && recommended.action === 'Split') {
-                reason += `While hitting a hard 4 is safe, the dealer's ${dealerValue} is a weak position. Splitting is a better play here, giving you two separate chances to beat them.`;
-            } else if (recommended.action === 'Stand' && incorrectAction === 'Hit') {
-                if (playerScore >= 17) {
-                    reason = `<strong>${recommended.reason}</strong> Hitting a hard ${playerScore} is extremely risky as you are very likely to bust. The correct play is to Stand regardless of the dealer's card.`;
-                } else {
-                    reason += `In this case, hitting a hard ${playerScore} is risky. Since the dealer shows a weak card (${dealerValue}), they are more likely to bust. You should let the dealer take that risk.`;
-                }
-            } else if (recommended.action === 'Stand' && incorrectAction === 'Double') {
-                 if (playerScore >= 17) {
-                    reason += `Doubling on a strong hand like ${playerScore} is an unnecessary risk. You should Stand to lock in your likely winning hand.`;
-                 } else {
-                    reason += `Doubling on a weak hand like ${playerScore} is far too risky, even against a dealer's bust card (${dealerValue}). The correct play is to Stand, taking no risk yourself, and let the dealer take the high probability of busting.`;
-                 }
-            } else if (recommended.action === 'Hit' && incorrectAction === 'Stand') {
-                reason += `Here, standing on ${playerScore} is too weak against a dealer's ${dealerValue}. You will likely lose unless you Hit for a better total.`;
-            } else if (recommended.action === 'Hit' && incorrectAction === 'Double') {
-                if ([2, 3].includes(dealerValue)) {
-                    reason += `Doubling is too risky against a dealer's ${dealerValue}. Although it's a low card, the dealer is less likely to bust with a ${dealerValue} than with other low cards (like 4, 5, or 6). The correct play is to Hit to improve your hand without risking more money against their safer position.`;
-                } else {
-                    reason += `Doubling is too risky when the dealer shows a ${dealerValue}. Their hand is strong, so you shouldn't risk more money on a single card draw.`;
-                }
-            } else if (recommended.action === 'Double' && incorrectAction === 'Hit') {
-                const handType = isSoft ? 'soft' : 'hard';
-                reason += `While hitting is safe, your ${handType} ${playerScore} is a great opportunity against the dealer's ${dealerValue}. You should Double to maximize your potential winnings.`;
-            } else if (recommended.action === 'Double' && incorrectAction === 'Stand') {
-                reason += `Standing on ${playerScore} is too conservative. This is a powerful starting hand against the dealer's ${dealerValue}, and you should Double Down to maximize your potential winnings.`;
-            } else {
-                // Generic fallback for any other uncovered scenario
-                return recommended.reason;
-            }
-            
-            return reason;
+            uiCtrl.updateShuffledMessageDisplay(currentGameState.shoe.showShuffledMessage);
         }
 
         return {
-            init: function() {
+            init: async function() {
                 console.log('Application has started.');
-                // Initialize frontend state (no backend calls here, just local state)
-                currentFrontendGameState = gameCtrl.getGameState();
-                uiCtrl.renderInitialShoe(currentFrontendGameState.shoe);
-                updateFullUI();
-                uiCtrl.displayGameMessage("Place your bet and click 'Deal New Hand' to start.");
+                // Initialize the game state on the backend first
+                await postAction('init_game', { shoeSize: parseInt(document.querySelector(DOM.shoeSizeSelect).value) });
+                // Then fetch and render the initial state
+                await fetchGameState();
                 setupEventListeners();
             }
         };
 
-    })(gameController, uiController, strategyController); // Pass strategyController here
+    })(uiController);
 
     // --- INITIALIZE APP ---
     appController.init();
