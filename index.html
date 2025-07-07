@@ -762,7 +762,7 @@
 
                     // Handle immediate game outcomes (Blackjack)
                     const playerHand = currentFrontendGameState.round.playerHands[0];
-                    const dealerHadBlackjack = currentFrontendGameState.dealerHadBlackjack; // From backend state
+                    const dealerHadBlackjack = currentFrontendGameState.round.dealerHadBlackjack; // From backend state
 
                     if (playerHand.isBlackjack && dealerHadBlackjack) {
                         uiCtrl.displayGameMessage(`Push! Both have Natural Blackjack.`, "push");
@@ -809,8 +809,8 @@
         // Generic function to send player actions to the backend
         async function ctrlPlayerAction(actionType) {
             const gameId = currentFrontendGameState.round.gameId;
-            const currentHandIndex = currentFrontendGameState.round.currentHandIndex;
-
+            const currentHandIndex = currentFrontendGameState.currentHandIndex; // Use currentHandIndex from currentFrontendGameState
+            
             if (!gameId) {
                 uiCtrl.displayGameMessage("Please start a new game first.", "info");
                 return;
@@ -838,13 +838,13 @@
                     gameCtrl.updateGameStateFromBackend(data.gameState);
                     
                     // Determine next step based on backend's state
-                    const updatedHand = currentFrontendGameState.round.playerHands[currentHandIndex];
+                    const updatedHand = currentFrontendGameState.round.playerHands[currentFrontendGameState.round.currentHandIndex]; // Re-fetch updated hand
 
                     if (!updatedHand.isActive || updatedHand.score >= 21) {
                         // If current hand is finished (busted, stood, 21, doubled), try to move to next hand
                         let foundNextHand = false;
                         // Search from the next index first
-                        for (let i = currentHandIndex + 1; i < currentFrontendGameState.round.playerHands.length; i++) {
+                        for (let i = currentFrontendGameState.round.currentHandIndex + 1; i < currentFrontendGameState.round.playerHands.length; i++) {
                             if (currentFrontendGameState.round.playerHands[i].isActive) {
                                 currentFrontendGameState.round.currentHandIndex = i;
                                 foundNextHand = true;
@@ -854,7 +854,7 @@
                         }
                         // If no active hand found after current index, check from beginning (for splits)
                         if (!foundNextHand) {
-                            for (let i = 0; i < currentHandIndex; i++) { // Check hands before the one just played
+                            for (let i = 0; i < currentFrontendGameState.round.playerHands.length; i++) { // Iterate through all hands
                                 if (currentFrontendGameState.round.playerHands[i].isActive) {
                                     currentFrontendGameState.round.currentHandIndex = i;
                                     foundNextHand = true;
@@ -901,12 +901,13 @@
                     gameCtrl.updateGameStateFromBackend(data.gameState);
                     
                     // Update frontend player stats and total balance based on backend results
-                    currentFrontendGameState.player.stats.handsPlayed += data.gameState.playerHands.length; // Add to total hands played
+                    // Ensure these are incremented, not overwritten, if multiple hands are played
+                    currentFrontendGameState.player.stats.handsPlayed += data.gameState.playerHands.length; 
                     data.gameState.playerHands.forEach(hand => {
                         if (hand.outcome === 'win') {
                             currentFrontendGameState.player.stats.handsWon++;
                         }
-                        currentFrontendGameState.player.totalBalance += hand.winnings; // Add/deduct winnings
+                        currentFrontendGameState.player.totalBalance += hand.winnings; 
                     });
 
                     // Display overall round message
@@ -968,7 +969,8 @@
             const canDoubleOrSplit = playerHand.cards.length === 2;
             const recommended = strategyCtrl.getBasicStrategyAdvice(playerHand.initialHandForStrategy, dealerUpCard, canDoubleOrSplit, gameConfig);
 
-            if (playerAction === recommended.action) {
+            // FIX: Convert both to lowercase for case-insensitive comparison
+            if (playerAction.toLowerCase() === recommended.action.toLowerCase()) {
                 currentFrontendGameState.player.stats.strategyCorrect++;
                 uiCtrl.displayAdvice(`Basic Strategy: <span class="advice-text-correct">Correct!</span> ${recommended.reason}`, 'correct');
             } else {
