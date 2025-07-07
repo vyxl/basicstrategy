@@ -228,7 +228,8 @@
 
     <script>
     // --- MODULE PATTERN: STRATEGY CONTROLLER ---
-    // This module can remain largely on the frontend as it's for advice, not authoritative game state.
+    // This module remains on the frontend as it's for providing strategy advice,
+    // not for managing the authoritative game state.
     const strategyController = (function() {
         const h17PairSplittingStrategy = {
             'A': { always: 'Split', reason: 'Always split Aces.'},
@@ -298,11 +299,17 @@
             },
             // This function is still needed on the frontend for advice
             getBasicStrategyAdvice: function(playerHandCards, dealerUpCard, canDoubleOrSplit, gameConfig) {
+                // Ensure playerHandCards is an array and has elements
+                if (!Array.isArray(playerHandCards) || playerHandCards.length === 0) {
+                    return { action: 'No Advice', reason: 'Invalid player hand for strategy advice.' };
+                }
+
                 const playerScore = this.calculateScore(playerHandCards);
                 const dealerValue = (dealerUpCard.value === 'A') ? 11 : (['K', 'Q', 'J'].includes(dealerUpCard.value) ? 10 : parseInt(dealerUpCard.value));
                 
                 const isPair = canDoubleOrSplit && playerHandCards[0].value === playerHandCards[1].value;
                 const hasAce = playerHandCards.some(card => card.value === 'A');
+                // Calculate soft score correctly: sum of non-aces + 11 (for one ace)
                 const isSoft = hasAce && (this.calculateScore(playerHandCards.filter(c => c.value !== 'A')) + 11) === playerScore;
 
                 const tables = this.getTables(gameConfig);
@@ -318,6 +325,9 @@
                     } else if (strat.splitVs.includes(dealerValue)) {
                         return { action: 'Split', reason: strat.reason };
                     } else {
+                        // If not splitting, the 'else' action (Hit/Stand) is usually for the resulting hard total.
+                        // We need to re-evaluate as a hard hand if 'NoSplit' was the advice.
+                        // For other 'else' cases, the strategy table already provides the action.
                         return { action: strat.else, reason: strat.reason };
                     }
                 }
@@ -393,7 +403,7 @@
             round: {
                 gameId: null, // New: To store the ID of the game session on the backend
                 playerHands: [],
-                dealerHand: { cards: [], upCardScore: 0 },
+                dealerHand: { cards: [], upCardScore: 0, score: 0 }, // Added score for dealer
                 currentHandIndex: 0,
                 isOver: true,
                 betAmount: 10
@@ -406,11 +416,7 @@
                 size: 6, totalCards: 0, cardsDealt: 0, cutCardPosition: 0, showShuffledMessage: false,
             },
             counts: { running: 0, true: 0, decksRemaining: 0 },
-            ui: {
-                message: "Place your bet and click 'Deal New Hand' to start.",
-                advice: { text: "", type: "neutral" }
-            },
-            gameConfig: { // Frontend's understanding of game rules
+            gameConfig: { // Frontend's understanding of game rules (for strategy advice)
                 dealerHitsOnSoft17: true,
                 blackjackPayout: 1.5,
                 maxHandsAfterSplitting: 4,
@@ -428,24 +434,27 @@
                 gameState.round.gameId = backendState.gameId;
                 gameState.round.playerHands = backendState.playerHands;
                 gameState.round.dealerHand = backendState.dealerHand;
-                gameState.round.currentHandIndex = backendState.currentHandIndex || 0; // Default to 0 if not provided
+                gameState.round.currentHandIndex = backendState.currentHandIndex; // Backend now controls this
                 gameState.round.isOver = backendState.isOver;
                 gameState.round.betAmount = backendState.playerHands[0] ? backendState.playerHands[0].bet : gameState.round.betAmount;
 
                 // Update counts
                 gameState.counts = backendState.counts;
                 
-                // Update player stats and balance only if the backend provides them or if logic moves here
-                // For now, we'll keep stats/balance updates primarily in appController after round ends.
+                // Update shoe info
+                gameState.shoe = backendState.shoe;
+
+                // Update player stats and balance (if backend sends it, otherwise manage here)
+                // For this example, we'll keep stats/balance updates in appController after round ends.
             },
             // The following functions are no longer authoritative, but might be used for UI display or strategy advice
-            // calculateScore: function(handCards) { /* ... same as before, but strategyCtrl also has it */ },
-            // updateRunningCount: function(card) { /* ... this will now be done by backend */ },
+            // calculateScore: function(handCards) { /* ... strategyCtrl has it */ },
+            // updateRunningCount: function(card) { /* ... backend handles this */ },
             // getInitialState: function() { /* ... frontend will initialize its own state */ },
             // setInitialState: function() { /* ... frontend will initialize its own state */ },
-            // reshuffleShoe: function() { /* ... backend will handle this */ },
-            // dealCard: function() { /* ... backend will handle this */ },
-            // determineGameResults: function() { /* ... backend will handle this */ },
+            // reshuffleShoe: function() { /* ... backend handles this */ },
+            // dealCard: function() { /* ... backend handles this */ },
+            // determineGameResults: function() { /* ... backend handles this */ },
             // getBasicStrategyAdvice: function() { /* ... strategyCtrl has this */ }
         };
     })();
@@ -522,7 +531,8 @@
             const cardsContainer = document.createElement('div');
             cardsContainer.className = 'card-container justify-center';
             hand.cards.forEach(card => {
-                const isHighlighted = hand.initialHandForStrategy && hand.initialHandForStrategy.some(c => c.value === card.value && c.suit === card.suit); // Deep comparison for objects
+                // Ensure initialHandForStrategy exists and contains the card for highlighting
+                const isHighlighted = hand.initialHandForStrategy && hand.initialHandForStrategy.some(c => c.value === card.value && c.suit === card.suit);
                 cardsContainer.appendChild(renderCard(card, false, isHighlighted));
             });
 
@@ -716,6 +726,7 @@
             uiCtrl.updateBalanceDisplay(currentFrontendGameState.player.totalBalance);
             uiCtrl.updateActionButtons(currentFrontendGameState);
             uiCtrl.updateShoeVisual(currentFrontendGameState.shoe);
+            uiCtrl.updateShuffledMessageDisplay(currentFrontendGameState.shoe.showShuffledMessage); // Show shuffle message if backend indicates
         }
 
         // --- Frontend functions that now call the Backend ---
@@ -742,44 +753,47 @@
 
                 if (data.success) {
                     // Update the frontend's game state with data from the backend
-                    currentFrontendGameState.round.gameId = data.gameId;
-                    currentFrontendGameState.round.playerHands = data.playerHands;
-                    currentFrontendGameState.round.dealerHand = {
-                        cards: [data.dealerHand.upCard, { value: '?', suit: '?' }], // Placeholder for hole card
-                        upCardScore: data.dealerHand.upCardScore
-                    };
-                    currentFrontendGameState.round.currentHandIndex = 0; // Always start with first hand
-                    currentFrontendGameState.round.isOver = data.isOver; // Check for immediate blackjack
-                    currentFrontendGameState.round.betAmount = betAmount; // Store bet amount
-                    currentFrontendGameState.counts = data.counts; // Update counts from backend
+                    gameCtrl.updateGameStateFromBackend(data.gameState);
+                    
+                    // Update player stats and balance for the frontend's display (backend is authoritative)
+                    // For a new game, reset stats and add bet to balance
+                    currentFrontendGameState.player.stats = { handsPlayed: 0, handsWon: 0, strategyOpportunities: 0, strategyCorrect: 0 };
+                    currentFrontendGameState.player.totalBalance -= betAmount; // Deduct initial bet
 
-                    // Update shoe visual based on backend's initial state (mocked for now)
-                    currentFrontendGameState.shoe.size = shoeSize;
-                    currentFrontendGameState.shoe.totalCards = shoeSize * 52;
-                    currentFrontendGameState.shoe.cardsDealt = 4; // 2 player, 2 dealer
-                    // We don't have cutCardPosition from backend yet, so visual will be static for now
-                    currentFrontendGameState.shoe.cutCardPosition = Math.floor(currentFrontendGameState.shoe.totalCards * 0.8); // Placeholder
-
-                    // Check for immediate blackjack or 21 and display message
+                    // Handle immediate game outcomes (Blackjack)
                     const playerHand = currentFrontendGameState.round.playerHands[0];
-                    if (playerHand.isBlackjack) {
-                        uiCtrl.displayGameMessage(`Natural Blackjack!`, "win");
-                        // If player has blackjack, the backend should have already set isOver to true
-                        // and determined winnings. We need to fetch the final state after dealer checks for blackjack.
-                        // For simplicity in this example, we'll just show the message.
-                        // In a full implementation, the backend would handle the full flow.
-                        await ctrlDealerTurn(); // Trigger dealer's turn immediately if player has BJ
-                    } else if (playerHand.score === 21) {
+                    const dealerHadBlackjack = currentFrontendGameState.dealerHadBlackjack; // From backend state
+
+                    if (playerHand.isBlackjack && dealerHadBlackjack) {
+                        uiCtrl.displayGameMessage(`Push! Both have Natural Blackjack.`, "push");
+                        currentFrontendGameState.player.totalBalance += playerHand.bet; // Return bet for push
+                    } else if (playerHand.isBlackjack) {
+                        uiCtrl.displayGameMessage(`Natural Blackjack! You win!`, "win");
+                        currentFrontendGameState.player.totalBalance += playerHand.winnings; // Add winnings
+                    } else if (dealerHadBlackjack) {
+                        uiCtrl.displayGameMessage(`Dealer has Natural Blackjack. You lose.`, "lose");
+                        // Winnings already deducted by bet
+                    } else if (playerHand.score === 21 && playerHand.cards.length > 2) {
+                        // Player has 21 but not blackjack (e.g., hit to 21 or split)
                         uiCtrl.displayGameMessage(`Hand ${currentFrontendGameState.round.currentHandIndex + 1}: You have 21! Automatically standing.`, "info");
-                        // This should also be handled by backend. For now, frontend auto-stands.
-                        await ctrlPlayerAction('stand'); // Automatically stand if 21
+                        // This case should already be handled by backend setting isActive to false
+                        // If all hands are now inactive, trigger dealer turn
+                        if (currentFrontendGameState.round.playerHands.every(hand => !hand.isActive)) {
+                            await ctrlDealerTurn();
+                        }
                     } else {
                         uiCtrl.displayGameMessage("Your turn. What's your move?");
                     }
 
-                    // For strategy advice, we need the initial hand
-                    playerHand.initialHandForStrategy = [...playerHand.cards];
-                    evaluatePlayerAction(playerHand, currentFrontendGameState.round.dealerHand.cards[0], 'Deal'); // Evaluate initial deal for advice
+                    // Evaluate strategy advice for the initial deal (bug fix: not an incorrect play)
+                    // Only evaluate if the game is not immediately over due to blackjacks
+                    if (!currentFrontendGameState.round.isOver) {
+                        evaluatePlayerAction(playerHand, currentFrontendGameState.round.dealerHand.cards[0], 'Initial Deal');
+                    } else {
+                        // If game is over immediately, clear advice or give specific message
+                        uiCtrl.clearAdvice();
+                    }
+
 
                 } else {
                     uiCtrl.displayGameMessage(data.message || "Failed to deal new hand.", "error");
@@ -829,6 +843,7 @@
                     if (!updatedHand.isActive || updatedHand.score >= 21) {
                         // If current hand is finished (busted, stood, 21, doubled), try to move to next hand
                         let foundNextHand = false;
+                        // Search from the next index first
                         for (let i = currentHandIndex + 1; i < currentFrontendGameState.round.playerHands.length; i++) {
                             if (currentFrontendGameState.round.playerHands[i].isActive) {
                                 currentFrontendGameState.round.currentHandIndex = i;
@@ -837,6 +852,18 @@
                                 break;
                             }
                         }
+                        // If no active hand found after current index, check from beginning (for splits)
+                        if (!foundNextHand) {
+                            for (let i = 0; i < currentHandIndex; i++) { // Check hands before the one just played
+                                if (currentFrontendGameState.round.playerHands[i].isActive) {
+                                    currentFrontendGameState.round.currentHandIndex = i;
+                                    foundNextHand = true;
+                                    uiCtrl.displayGameMessage(`Playing Hand ${currentFrontendGameState.round.currentHandIndex + 1}. What's your move?`);
+                                    break;
+                                }
+                            }
+                        }
+
                         if (!foundNextHand) { // No more active player hands, dealer's turn
                             await ctrlDealerTurn();
                         }
@@ -872,11 +899,17 @@
 
                 if (data.success) {
                     gameCtrl.updateGameStateFromBackend(data.gameState);
-                    // Update player stats based on final outcomes
-                    currentFrontendGameState.player.stats.handsPlayed = data.gameState.playerHands.length; // Simplified
-                    currentFrontendGameState.player.stats.handsWon = data.gameState.playerHands.filter(h => h.outcome === 'win').length; // Simplified
-                    currentFrontendGameState.player.totalBalance = data.gameState.playerHands.reduce((acc, hand) => acc + hand.winnings, currentFrontendGameState.player.totalBalance); // Update balance
+                    
+                    // Update frontend player stats and total balance based on backend results
+                    currentFrontendGameState.player.stats.handsPlayed += data.gameState.playerHands.length; // Add to total hands played
+                    data.gameState.playerHands.forEach(hand => {
+                        if (hand.outcome === 'win') {
+                            currentFrontendGameState.player.stats.handsWon++;
+                        }
+                        currentFrontendGameState.player.totalBalance += hand.winnings; // Add/deduct winnings
+                    });
 
+                    // Display overall round message
                     let overallMsg = "";
                     data.gameState.playerHands.forEach((hand, index) => {
                         if (hand.outcome === 'win') overallMsg += `Hand ${index + 1}: Win! `;
@@ -897,7 +930,7 @@
         }
 
         function ctrlResetGame() {
-            // Reset frontend UI state
+            // Reset frontend UI state and stats (backend will reset its state on next /api/game/new)
             currentFrontendGameState = gameCtrl.getGameState(); // Re-initialize frontend state
             uiCtrl.renderInitialShoe(currentFrontendGameState.shoe); // Render initial shoe visual
             updateFullUI();
@@ -905,11 +938,29 @@
             uiCtrl.clearAdvice();
         }
 
+        // This function provides strategy advice and updates frontend stats for correctness.
+        // It does NOT affect the backend game state.
         function evaluatePlayerAction(playerHand, dealerUpCard, playerAction) {
-            // This logic remains on frontend as it's for advice, not authoritative game state.
-            // It uses the frontend's current game state and strategy controller.
-            const gameConfig = currentFrontendGameState.gameConfig; // Pass frontend's gameConfig
-            if (playerHand.isBlackjack || currentFrontendGameState.round.dealerHadBlackjack || (playerHand.score === 21 && playerHand.cards.length > 2)) {
+            // Only evaluate if it's a real player action, not the initial deal.
+            if (playerAction === 'Initial Deal') {
+                // For initial deal, just check for blackjacks and don't count as strategy opportunity
+                if (playerHand.isBlackjack || currentFrontendGameState.round.dealerHadBlackjack) {
+                    // Already handled messages in ctrlDealNewHand
+                    return;
+                }
+                // If it's a 21 on initial deal but not BJ, it's auto-stand, so count as correct strategy
+                if (playerHand.score === 21 && playerHand.cards.length === 2 && !playerHand.isBlackjack) {
+                    currentFrontendGameState.player.stats.strategyOpportunities++;
+                    currentFrontendGameState.player.stats.strategyCorrect++;
+                    uiCtrl.displayAdvice(`Basic Strategy: <span class="advice-text-correct">Correct!</span> You have 21, automatically standing.`, 'correct');
+                }
+                return;
+            }
+
+            // For actual player actions (Hit, Stand, Double, Split)
+            const gameConfig = currentFrontendGameState.gameConfig;
+            if (playerHand.isBlackjack || currentFrontendGameState.round.dealerHadBlackjack || (playerHand.score === 21 && playerHand.cards.length > 2 && playerAction !== 'split')) {
+                // Don't evaluate if game is already decided or hand is auto-stood (unless splitting)
                 return;
             }
 
@@ -926,8 +977,9 @@
             }
         }
 
+        // This function remains on the frontend to provide detailed reasons for strategy advice.
         function generateEnhancedReason(recommended, incorrectAction, playerHand, dealerUpCard, gameConfig) {
-            const playerScore = strategyCtrl.calculateScore(playerHand.cards); // Use strategyCtrl's calculateScore
+            const playerScore = strategyCtrl.calculateScore(playerHand.cards);
             const dealerValue = (dealerUpCard.value === 'A') ? 11 : (['K', 'Q', 'J'].includes(dealerUpCard.value) ? 10 : parseInt(dealerUpCard.value));
             const isSoft = playerHand.cards.some(c => c.value === 'A') && (strategyCtrl.calculateScore(playerHand.cards.filter(c => c.value !== 'A')) + 11) === playerScore;
             const isPair = playerHand.cards.length === 2 && playerHand.cards[0].value === playerHand.cards[1].value;
