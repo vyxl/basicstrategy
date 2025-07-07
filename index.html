@@ -620,7 +620,7 @@
                 const wonPct = handsPlayed > 0 ? ((handsWon / handsPlayed) * 100).toFixed(1) : 0;
                 const correctPct = strategyOpportunities > 0 ? ((strategyCorrect / strategyOpportunities) * 100).toFixed(1) : 0;
                 document.querySelector(DOMstrings.handsWonDisplay).textContent = `Hands Won: ${handsWon} / ${handsPlayed} (${wonPct}%)`;
-                document.querySelector(DOMstrings.strategyCorrectDisplay).textContent = `Strategy Correct: ${strategyCorrect} / ${strategyOpportunities} (${correctPct}%)`;
+                document.querySelector(DOMstrings.strategyCorrectDisplay).textContent = `Strategy Correct: ${correctPct} / ${strategyOpportunities} (${correctPct}%)`;
             },
 
             updateCardCountingDisplays: function(counts) {
@@ -809,7 +809,7 @@
         // Generic function to send player actions to the backend
         async function ctrlPlayerAction(actionType) {
             const gameId = currentFrontendGameState.round.gameId;
-            const currentHandIndex = currentFrontendGameState.round.currentHandIndex; // FIX: Corrected access path
+            const currentHandIndex = currentFrontendGameState.round.currentHandIndex; // Corrected access path
             
             if (!gameId) {
                 uiCtrl.displayGameMessage("Please start a new game first.", "info");
@@ -820,6 +820,7 @@
             if (!currentHand || !currentHand.isActive || currentFrontendGameState.round.isOver) return;
 
             // Evaluate strategy BEFORE sending to backend, as advice is frontend-only
+            // FIX: Pass playerHand.cards for strategy advice, not initialHandForStrategy
             evaluatePlayerAction(currentHand, currentFrontendGameState.round.dealerHand.cards[0], actionType);
 
             uiCtrl.displayGameMessage(`Processing ${actionType}...`);
@@ -970,7 +971,8 @@
 
             currentFrontendGameState.player.stats.strategyOpportunities++;
             const canDoubleOrSplit = playerHand.cards.length === 2;
-            const recommended = strategyCtrl.getBasicStrategyAdvice(playerHand.initialHandForStrategy, dealerUpCard, canDoubleOrSplit, gameConfig);
+            // FIX: Pass playerHand.cards for strategy advice, not initialHandForStrategy
+            const recommended = strategyCtrl.getBasicStrategyAdvice(playerHand.cards, dealerUpCard, canDoubleOrSplit, gameConfig);
 
             // FIX: Convert both to lowercase for case-insensitive comparison
             if (playerAction.toLowerCase() === recommended.action.toLowerCase()) {
