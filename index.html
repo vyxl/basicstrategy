@@ -809,7 +809,7 @@
         // Generic function to send player actions to the backend
         async function ctrlPlayerAction(actionType) {
             const gameId = currentFrontendGameState.round.gameId;
-            const currentHandIndex = currentFrontendGameState.currentHandIndex; // Use currentHandIndex from currentFrontendGameState
+            const currentHandIndex = currentFrontendGameState.round.currentHandIndex; // FIX: Corrected access path
             
             if (!gameId) {
                 uiCtrl.displayGameMessage("Please start a new game first.", "info");
@@ -843,28 +843,31 @@
                     if (!updatedHand.isActive || updatedHand.score >= 21) {
                         // If current hand is finished (busted, stood, 21, doubled), try to move to next hand
                         let foundNextHand = false;
-                        // Search from the next index first
+                        let nextIndex = -1;
+
+                        // First, try to find an active hand *after* the current one
                         for (let i = currentFrontendGameState.round.currentHandIndex + 1; i < currentFrontendGameState.round.playerHands.length; i++) {
                             if (currentFrontendGameState.round.playerHands[i].isActive) {
-                                currentFrontendGameState.round.currentHandIndex = i;
+                                nextIndex = i;
                                 foundNextHand = true;
-                                uiCtrl.displayGameMessage(`Playing Hand ${currentFrontendGameState.round.currentHandIndex + 1}. What's your move?`);
                                 break;
                             }
                         }
-                        // If no active hand found after current index, check from beginning (for splits)
+                        // If no active hand found after current, check from the beginning of the hands array
                         if (!foundNextHand) {
-                            for (let i = 0; i < currentFrontendGameState.round.playerHands.length; i++) { // Iterate through all hands
+                            for (let i = 0; i < currentFrontendGameState.round.playerHands.length; i++) {
                                 if (currentFrontendGameState.round.playerHands[i].isActive) {
-                                    currentFrontendGameState.round.currentHandIndex = i;
+                                    nextIndex = i;
                                     foundNextHand = true;
-                                    uiCtrl.displayGameMessage(`Playing Hand ${currentFrontendGameState.round.currentHandIndex + 1}. What's your move?`);
                                     break;
                                 }
                             }
                         }
 
-                        if (!foundNextHand) { // No more active player hands, dealer's turn
+                        if (foundNextHand) {
+                            currentFrontendGameState.round.currentHandIndex = nextIndex; // Update frontend's current hand index
+                            uiCtrl.displayGameMessage(`Playing Hand ${currentFrontendGameState.round.currentHandIndex + 1}. What's your move?`);
+                        } else { // No more active player hands, trigger dealer's turn
                             await ctrlDealerTurn();
                         }
                     } else {
