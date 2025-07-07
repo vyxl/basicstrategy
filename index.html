@@ -256,148 +256,47 @@
             gameRulesHeader: '#game-rules-header'
         };
 
-        function renderCard(card, isHidden = false, isHighlighted = false) {
-            const cardDiv = document.createElement('div');
-            cardDiv.className = `card ${card.suit === '♥' || card.suit === '♦' ? 'red' : ''} ${isHighlighted ? 'highlight-card' : ''}`;
-            
-            if (isHidden) {
-                cardDiv.classList.add('card-back');
-                cardDiv.innerHTML = '';
-            } else {
-                cardDiv.innerHTML = `<div class="card-suit-top self-start">${card.suit}</div><div class="card-value">${card.value}</div><div class="card-suit-bottom self-end">${card.suit}</div>`;
-                const val = card.value;
-                if (['2', '3', '4', '5', '6'].includes(val)) {
-                    cardDiv.classList.add('card-count-positive');
-                } else if (['10', 'J', 'Q', 'K', 'A'].includes(val)) {
-                    cardDiv.classList.add('card-count-negative');
-                }
-            }
-            return cardDiv;
-        }
-
-        function renderPlayerHand(hand, index, currentHandIndex, isGameOver) {
-            const handWrapper = document.createElement('div');
-            handWrapper.id = `player-hand-${index}`;
-            handWrapper.className = 'player-hand-wrapper flex flex-col items-center';
-            
-            handWrapper.classList.remove('active', 'busted', 'stood');
-
-            if (index === currentHandIndex && !isGameOver && hand.isActive) {
-                handWrapper.classList.add('active');
-            } else if (hand.score > 21) {
-                handWrapper.classList.add('busted');
-            } else if (!hand.isActive) {
-                handWrapper.classList.add('stood');
-            }
-
-            const scoreSpan = document.createElement('span');
-            scoreSpan.className = 'text-lg font-semibold mb-2';
-            scoreSpan.textContent = `Score: ${hand.score}`;
-
-            const cardsContainer = document.createElement('div');
-            cardsContainer.className = 'card-container justify-center';
-            hand.cards.forEach(card => {
-                // For initialHandForStrategy, we need to compare card objects.
-                // Since they come from the backend, they are new objects.
-                // We'll highlight based on if their value/suit matches the initial hand.
-                const isHighlighted = hand.initialHandForStrategy.some(initialCard => 
-                    initialCard.value === card.value && initialCard.suit === card.suit
-                );
-                cardsContainer.appendChild(renderCard(card, false, isHighlighted));
-            });
-
-            handWrapper.append(scoreSpan, cardsContainer);
-
-            if (hand.winnings !== null) {
-                const winningsDiv = document.createElement('div');
-                winningsDiv.className = 'text-lg font-bold mt-2';
-                const sign = hand.winnings > 0 ? '+' : (hand.winnings < 0 ? '-' : '');
-                const color = hand.winnings > 0 ? 'text-green-400' : (hand.winnings < 0 ? 'text-red-400' : 'text-gray-400');
-                winningsDiv.innerHTML = `<span class="${color}">${sign}$${Math.abs(hand.winnings).toFixed(2)}</span>`;
-                handWrapper.appendChild(winningsDiv);
-            }
-            return handWrapper;
-        }
-
         return {
             getDOMstrings: function() {
                 return DOMstrings;
             },
 
+            // Renders player hands using HTML received from backend
             renderAllPlayerHands: function(gameState) {
-                const container = document.querySelector(DOMstrings.playerHandsContainer);
-                container.innerHTML = '';
-                gameState.round.playerHands.forEach((hand, index) => {
-                    container.appendChild(renderPlayerHand(hand, index, gameState.round.currentHandIndex, gameState.round.isOver));
-                });
+                document.querySelector(DOMstrings.playerHandsContainer).innerHTML = gameState.ui.playerHandsHtml;
             },
 
-            renderDealerHand: function(dealerHand, isGameOver) {
-                const container = document.querySelector(DOMstrings.dealerHandDiv);
-                container.innerHTML = '';
-                dealerHand.forEach((card, index) => {
-                    const isHidden = !isGameOver && index === 1;
-                    const isHighlighted = index === 0;
-                    container.appendChild(renderCard(card, isHidden, isHighlighted));
-                });
+            // Renders dealer hand using HTML received from backend
+            // Changed the parameter to accept the full gameState
+            renderDealerHand: function(gameState) {
+                document.querySelector(DOMstrings.dealerHandDiv).innerHTML = gameState.ui.dealerHandHtml;
             },
 
+            // Simplified: now uses pre-calculated dealerDisplayScore from backend
             updateScores: function(gameState) {
-                // Dealer score calculation is now done on the backend
-                const dealerUpCardScore = (gameState.round.dealerHand && gameState.round.dealerHand.length > 0) ? 
-                                          (gameState.round.dealerHand[0].value === 'A' ? 11 : 
-                                           (['K', 'Q', 'J'].includes(gameState.round.dealerHand[0].value) ? 10 : 
-                                            parseInt(gameState.round.dealerHand[0].value))) : 0;
-
-                const scoreText = gameState.round.isOver ? gameState.round.dealerScore : dealerUpCardScore;
-                document.querySelector(DOMstrings.dealerScoreSpan).textContent = scoreText;
+                document.querySelector(DOMstrings.dealerScoreSpan).textContent = gameState.ui.dealerDisplayScore;
             },
 
+            // Simplified: now uses pre-calculated button states from backend
             updateActionButtons: function(gameState) {
-                const currentHand = gameState.round.playerHands[gameState.round.currentHandIndex];
-                const enable = (btn) => { document.querySelector(btn).disabled = false; };
-                const disable = (btn) => { document.querySelector(btn).disabled = true; };
+                const buttons = gameState.ui.buttons;
+                document.querySelector(DOMstrings.dealButton).disabled = !buttons.deal;
+                document.querySelector(DOMstrings.hitButton).disabled = !buttons.hit;
+                document.querySelector(DOMstrings.standButton).disabled = !buttons.stand;
+                document.querySelector(DOMstrings.doubleButton).disabled = !buttons.double;
+                document.querySelector(DOMstrings.splitButton).disabled = !buttons.split;
 
-                if (gameState.round.isOver) {
-                    disable(DOMstrings.hitButton); disable(DOMstrings.standButton); disable(DOMstrings.doubleButton); disable(DOMstrings.splitButton);
-                    enable(DOMstrings.dealButton);
-                    document.querySelector(DOMstrings.betAmountInput).disabled = false;
-                    return;
-                }
-
-                disable(DOMstrings.dealButton);
-                document.querySelector(DOMstrings.betAmountInput).disabled = true;
-
-                if (!currentHand || !currentHand.isActive) {
-                    disable(DOMstrings.hitButton); disable(DOMstrings.standButton); disable(DOMstrings.doubleButton); disable(DOMstrings.splitButton);
-                    return;
-                }
-
-                enable(DOMstrings.hitButton);
-                enable(DOMstrings.standButton);
-                
-                // Check if double is allowed (only on initial 2 cards, not split aces)
-                if (currentHand.cards.length === 2 && !currentHand.isSplitAce) enable(DOMstrings.doubleButton);
-                else disable(DOMstrings.doubleButton);
-
-                // Check if split is allowed (only on initial 2 cards, matching values, and max hands not reached)
-                if (currentHand.cards.length === 2 && currentHand.cards[0].value === currentHand.cards[1].value && gameState.round.playerHands.length < gameState.gameConfig.maxHandsAfterSplitting) enable(DOMstrings.splitButton);
-                else disable(DOMstrings.splitButton);
-
-                // Special case for split aces: after one card, they stand automatically
-                if (currentHand.isSplitAce && currentHand.cards.length === 2 && !currentHand.isActive) {
-                    disable(DOMstrings.hitButton); disable(DOMstrings.standButton); disable(DOMstrings.doubleButton);
-                }
+                // Bet amount input is enabled only when deal button is enabled
+                document.querySelector(DOMstrings.betAmountInput).disabled = !buttons.deal;
             },
 
+            // Simplified: now uses pre-calculated percentages from backend
             updateStatisticsDisplay: function(stats) {
-                const { handsPlayed, handsWon, strategyOpportunities, strategyCorrect } = stats;
-                const wonPct = handsPlayed > 0 ? ((handsWon / handsPlayed) * 100).toFixed(1) : 0;
-                const correctPct = strategyOpportunities > 0 ? ((strategyCorrect / strategyOpportunities) * 100).toFixed(1) : 0;
-                document.querySelector(DOMstrings.handsWonDisplay).textContent = `Hands Won: ${handsWon} / ${handsPlayed} (${wonPct}%)`;
-                document.querySelector(DOMstrings.strategyCorrectDisplay).textContent = `Strategy Correct: ${strategyCorrect} / ${strategyOpportunities} (${correctPct}%)`;
+                document.querySelector(DOMstrings.handsWonDisplay).textContent = `Hands Won: ${stats.handsWon} / ${stats.handsPlayed} (${stats.handsWonPct.toFixed(1)}%)`;
+                document.querySelector(DOMstrings.strategyCorrectDisplay).textContent = `Strategy Correct: ${stats.strategyCorrect} / ${stats.strategyOpportunities} (${stats.strategyCorrectPct.toFixed(1)}%)`;
             },
 
+            // Simplified: now uses pre-calculated counts from backend
             updateCardCountingDisplays: function(counts, shoe) {
                 document.querySelector(DOMstrings.runningCountDisplay).textContent = counts.running;
                 document.querySelector(DOMstrings.decksRemainingDisplay).textContent = counts.decksRemaining.toFixed(1);
@@ -522,10 +421,12 @@
             document.querySelector(DOM.doubleButton).addEventListener('click', () => postAction('double'));
             document.querySelector(DOM.splitButton).addEventListener('click', () => postAction('split'));
             
+            // Event listener for shoe size change
             document.querySelector(DOM.shoeSizeSelect).addEventListener('change', async (event) => {
                 const newShoeSize = parseInt(event.target.value);
                 await postAction('set_shoe_size', { shoeSize: newShoeSize });
             });
+            // Event listener for bet amount change
             document.querySelector(DOM.betAmountInput).addEventListener('change', async (event) => {
                 const newBetAmount = parseInt(event.target.value);
                 await postAction('set_bet_amount', { betAmount: newBetAmount });
@@ -543,13 +444,16 @@
                 return;
             }
 
+            // Now, these functions directly use the HTML strings from the backend
             uiCtrl.renderAllPlayerHands(currentGameState);
-            uiCtrl.renderDealerHand(currentGameState.round.dealerHand, currentGameState.round.isOver);
-            uiCtrl.updateScores(currentGameState);
-            uiCtrl.updateStatisticsDisplay(currentGameState.player.stats);
-            uiCtrl.updateCardCountingDisplays(currentGameState.counts, currentGameState.shoe);
+            // Pass the entire currentGameState object to renderDealerHand
+            uiCtrl.renderDealerHand(currentGameState); 
+            
+            uiCtrl.updateScores(currentGameState); 
+            uiCtrl.updateStatisticsDisplay(currentGameState.player.stats); 
+            uiCtrl.updateCardCountingDisplays(currentGameState.counts, currentGameState.shoe); 
             uiCtrl.updateBalanceDisplay(currentGameState.player.totalBalance);
-            uiCtrl.updateActionButtons(currentGameState);
+            uiCtrl.updateActionButtons(currentGameState); 
             uiCtrl.updateShoeVisual(currentGameState.shoe);
             uiCtrl.displayGameMessage(currentGameState.ui.message);
             if (currentGameState.ui.advice && currentGameState.ui.advice.text) {
