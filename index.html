@@ -145,21 +145,58 @@
             transform: rotate(-90deg);
         }
 
-        /* === NEW CSS FOR MOBILE FRIENDLINESS === */
-        /* Ensure message areas have a minimum height to prevent layout shifts */
-        #game-message {
-            min-height: 3.5rem; /* Adjusted for potential 2-line messages */
-            /* Add padding-top/bottom to ensure space even when textContent is empty */
-            padding-top: 0.5rem;
-            padding-bottom: 0.5rem;
+        /* === NEW CSS FOR MOBILE FRIENDLINESS (Modal/Toast) === */
+        /* Removed min-height from #game-message and #advice-message for this approach */
+        /* Re-added hidden class for #advice-message in HTML */
+
+        /* Modal Overlay */
+        .modal-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0, 0, 0, 0.7);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            z-index: 1000;
+            opacity: 0;
+            visibility: hidden;
+            transition: opacity 0.3s ease-in-out, visibility 0.3s ease-in-out;
         }
-        #advice-message {
-            min-height: 7rem; /* Adjusted for potential 3-4 line messages */
-            margin-top: 1rem; /* Ensure consistent spacing */
-            margin-bottom: 1rem; /* Ensure consistent spacing */
-            /* Add padding-top/bottom to ensure space even when innerHTML is empty */
-            padding-top: 1rem;
-            padding-bottom: 1rem;
+        .modal-overlay.show {
+            opacity: 1;
+            visibility: visible;
+        }
+
+        /* Modal Content */
+        .modal-content {
+            background-color: #2d3748; /* Dark background for modal */
+            padding: 1.5rem;
+            border-radius: 0.75rem;
+            box-shadow: 0 8px 16px rgba(0, 0, 0, 0.3);
+            max-width: 90%;
+            width: 400px;
+            text-align: center;
+            position: relative;
+        }
+        .modal-close-button {
+            position: absolute;
+            top: 0.5rem;
+            right: 0.5rem;
+            background: none;
+            border: none;
+            font-size: 1.5rem;
+            color: #cbd5e0;
+            cursor: pointer;
+            padding: 0.2rem 0.5rem;
+            border-radius: 0.25rem;
+            transition: background-color 0.2s ease-in-out, color 0.2s ease-in-out;
+        }
+        .modal-close-button:hover {
+            background-color: rgba(255, 255, 255, 0.1);
+            color: #f7fafc;
         }
 
         /* On smaller screens, reduce font size for messages if needed */
@@ -167,10 +204,7 @@
             #game-message {
                 font-size: 1rem; /* Smaller font on mobile */
             }
-            #advice-message {
-                font-size: 0.9rem; /* Smaller font on mobile */
-                padding: 0.75rem; /* Reduce padding */
-            }
+            /* Advice message will now be in the modal, so no direct styling here */
             .card {
                 width: 60px; /* Slightly smaller cards on mobile */
                 height: 90px;
@@ -274,17 +308,27 @@
             <div id="player-hands-container" class="flex flex-wrap justify-center gap-4"></div>
         </div>
 
-        <!-- Messages & Controls -->
-        <!-- Removed 'hidden' class from here. Min-height will ensure space. -->
+        <!-- Game Message (still inline, but less likely to cause jumps) -->
         <div id="game-message" class="text-center text-xl font-bold mb-4"></div>
-        <!-- Removed 'hidden' class from here. Min-height will ensure space. -->
-        <div id="advice-message" class="p-4 mt-4 rounded-lg text-center font-bold text-lg text-gray-100"></div>
+        
+        <!-- Advice Message (now handled by modal, this div is no longer used for displaying advice) -->
+        <!-- Keeping it in HTML for consistency with DOMstrings, but it's hidden and unused for advice text -->
+        <div id="advice-message" class="p-4 mt-4 rounded-lg text-center font-bold text-lg text-gray-100 hidden"></div>
+
         <div class="flex flex-wrap justify-center gap-4 mt-6">
             <button id="deal-button" class="px-4 py-2 rounded-lg font-semibold transition-all duration-200 ease-in-out bg-green-500 hover:bg-green-600 shadow-md border-2 border-green-700 text-white disabled:bg-gray-500 disabled:cursor-not-allowed disabled:border-gray-600 disabled:text-gray-400">Deal New Hand</button>
             <button id="hit-button" class="px-4 py-2 rounded-lg font-semibold transition-all duration-200 ease-in-out bg-green-500 hover:bg-green-600 shadow-md border-2 border-green-700 text-white disabled:bg-gray-500 disabled:cursor-not-allowed disabled:border-gray-600 disabled:text-gray-400" disabled>Hit</button>
             <button id="stand-button" class="px-4 py-2 rounded-lg font-semibold transition-all duration-200 ease-in-out bg-green-500 hover:bg-green-600 shadow-md border-2 border-green-700 text-white disabled:bg-gray-500 disabled:cursor-not-allowed disabled:border-gray-600 disabled:text-gray-400" disabled>Stand</button>
             <button id="double-button" class="px-4 py-2 rounded-lg font-semibold transition-all duration-200 ease-in-out bg-green-500 hover:bg-green-600 shadow-md border-2 border-green-700 text-white disabled:bg-gray-500 disabled:cursor-not-allowed disabled:border-gray-600 disabled:text-gray-400" disabled>Double Down</button>
             <button id="split-button" class="px-4 py-2 rounded-lg font-semibold transition-all duration-200 ease-in-out bg-green-500 hover:bg-green-600 shadow-md border-2 border-green-700 text-white disabled:bg-gray-500 disabled:cursor-not-allowed disabled:border-gray-600 disabled:text-gray-400" disabled>Split</button>
+        </div>
+    </div>
+
+    <!-- NEW: Modal for Advice Messages -->
+    <div id="advice-modal-overlay" class="modal-overlay">
+        <div id="advice-modal-content" class="modal-content">
+            <button id="modal-close-button" class="modal-close-button">&times;</button>
+            <div id="modal-advice-text" class="text-gray-100 font-bold text-lg mb-2"></div>
         </div>
     </div>
 
@@ -302,7 +346,8 @@
             dealerHandDiv: '#dealer-hand',
             dealerScoreSpan: '#dealer-score',
             gameMessageDiv: '#game-message',
-            adviceMessageDiv: '#advice-message',
+            // adviceMessageDiv is now only for DOMstrings, actual advice rendered in modal
+            adviceMessageDiv: '#advice-message', 
             handsWonDisplay: '#hands-won-display',
             strategyCorrectDisplay: '#strategy-correct-display',
             runningCountDisplay: '#running-count-display',
@@ -315,7 +360,11 @@
             cutCardVisualDiv: '#cut-card-visual',
             shuffledMessageDiv: '#shuffled-message',
             gameRulesContainer: '#game-rules-container',
-            gameRulesHeader: '#game-rules-header'
+            gameRulesHeader: '#game-rules-header',
+            // New Modal DOM elements
+            adviceModalOverlay: '#advice-modal-overlay',
+            modalAdviceText: '#modal-advice-text',
+            modalCloseButton: '#modal-close-button'
         };
 
         return {
@@ -406,36 +455,32 @@
                 if (type === 'win') el.classList.add('text-green-500');
                 else if (type === 'lose') el.classList.add('text-red-500');
                 else if (type === 'push') el.classList.add('text-blue-500');
-                // Ensure padding is applied even if message is empty
-                el.style.paddingTop = '0.5rem';
-                el.style.paddingBottom = '0.5rem';
             },
 
+            // NEW: Display advice in a modal
             displayAdvice: function(advice) {
-                const el = document.querySelector(DOMstrings.adviceMessageDiv);
-                const baseClasses = 'p-4 mt-4 rounded-lg text-center font-bold text-lg';
+                const modalOverlay = document.querySelector(DOMstrings.adviceModalOverlay);
+                const modalAdviceText = document.querySelector(DOMstrings.modalAdviceText);
+                const modalContent = document.querySelector('#advice-modal-content'); // Get content for background color
+
+                modalAdviceText.innerHTML = advice.text;
+                
+                // Set modal content background based on advice type
+                modalContent.classList.remove('bg-green-700', 'bg-red-700', 'bg-blue-700');
                 const typeClasses = {
                     correct: 'bg-green-700',
                     incorrect: 'bg-red-700',
                     neutral: 'bg-blue-700'
                 };
-                // Apply specific color background
-                el.className = `${baseClasses} ${typeClasses[advice.type]}`;
-                el.innerHTML = advice.text;
-                // Ensure padding is applied
-                el.style.paddingTop = '1rem';
-                el.style.paddingBottom = '1rem';
+                modalContent.classList.add(typeClasses[advice.type]);
+
+                modalOverlay.classList.add('show'); // Show the modal
             },
 
+            // NEW: Clear/hide the advice modal
             clearAdvice: function() {
-                const el = document.querySelector(DOMstrings.adviceMessageDiv);
-                const baseClasses = 'p-4 mt-4 rounded-lg text-center font-bold text-lg';
-                // Set to transparent background and clear content
-                el.className = `${baseClasses} bg-transparent`; // Make it transparent
-                el.innerHTML = '';
-                // Ensure padding is applied even when content is empty
-                el.style.paddingTop = '1rem';
-                el.style.paddingBottom = '1rem';
+                const modalOverlay = document.querySelector(DOMstrings.adviceModalOverlay);
+                modalOverlay.classList.remove('show'); // Hide the modal
             }
         };
     })();
@@ -509,6 +554,15 @@
             document.querySelector(DOM.gameRulesHeader).addEventListener('click', () => {
                 document.querySelector(DOM.gameRulesContainer).classList.toggle('collapsed');
             });
+
+            // NEW: Event listener for modal close button
+            document.querySelector(DOM.modalCloseButton).addEventListener('click', uiCtrl.clearAdvice);
+            // Also close modal if clicking outside the content
+            document.querySelector(DOM.adviceModalOverlay).addEventListener('click', (event) => {
+                if (event.target === document.querySelector(DOM.adviceModalOverlay)) {
+                    uiCtrl.clearAdvice();
+                }
+            });
         }
 
         function updateFullUI() {
@@ -529,13 +583,14 @@
             uiCtrl.updateActionButtons(currentGameState); 
             uiCtrl.updateShoeVisual(currentGameState.shoe);
             
-            // Always call displayGameMessage and displayAdvice with current state's message/advice
-            // This ensures they handle clearing/displaying correctly
+            // Game message is still inline
             uiCtrl.displayGameMessage(currentGameState.ui.message);
+
+            // Advice is now displayed in the modal
             if (currentGameState.ui.advice && currentGameState.ui.advice.text) {
                 uiCtrl.displayAdvice(currentGameState.ui.advice);
             } else {
-                // If no advice text, explicitly clear it to apply transparent background
+                // If no advice text, explicitly hide the modal
                 uiCtrl.clearAdvice();
             }
             uiCtrl.updateShuffledMessageDisplay(currentGameState.shoe.showShuffledMessage);
