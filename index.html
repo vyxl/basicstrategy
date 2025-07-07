@@ -145,6 +145,10 @@
             transform: rotate(-90deg);
         }
 
+        /* === NEW CSS FOR MOBILE FRIENDLINESS (Modal/Toast) === */
+        /* Removed min-height from #game-message and #advice-message for this approach */
+        /* Re-added hidden class for #advice-message in HTML */
+
         /* Modal Overlay */
         .modal-overlay {
             position: fixed;
@@ -195,96 +199,43 @@
             color: #f7fafc;
         }
 
-        /* === MOBILE-SPECIFIC VERTICAL SPACING ADJUSTMENTS === */
+        /* On smaller screens, reduce font size for messages if needed */
         @media (max-width: 768px) {
-            /* General container padding */
-            .bg-gray-800 {
-                padding: 0.75rem; /* Reduced from 1.5rem */
-            }
-
-            /* Title */
-            h1 {
-                margin-bottom: 1rem; /* Reduced from 1.5rem (mb-6) */
-                font-size: 2.25rem; /* Slightly smaller title */
-            }
-
-            /* Game Rules */
-            #game-rules-container {
-                margin-bottom: 1rem; /* Reduced from 2rem (mb-8) */
-                padding: 0.75rem; /* Reduced from 0.75rem (p-3) */
-            }
-            #game-rules-header {
-                font-size: 1.1rem;
-            }
-            #game-rules-content p {
-                font-size: 0.8rem;
-            }
-
-            /* Controls & Shoe Display */
-            .flex.flex-col.md\:flex-row.justify-center.md\:justify-around.items-center.gap-4.mb-6 {
-                margin-bottom: 1rem; /* Reduced from 1.5rem (mb-6) */
-                gap: 0.75rem; /* Reduced gap between elements */
-            }
-            .flex.flex-col.md\:flex-row > div {
-                margin-bottom: 0.5rem; /* Add some spacing between stacked elements */
-            }
-            .flex.flex-col.md\:flex-row > div:last-child {
-                margin-bottom: 0;
-            }
-
-            /* Balance & Stats */
-            .text-2xl.font-bold.mb-6 {
-                margin-bottom: 1rem; /* Reduced from 1.5rem (mb-6) */
-            }
-            .grid.grid-cols-2.md\:grid-cols-4.gap-4.text-lg.font-semibold.mb-6.text-center {
-                margin-bottom: 1rem; /* Reduced from 1.5rem (mb-6) */
-                gap: 0.5rem; /* Reduced gap */
-                font-size: 0.9rem; /* Smaller text */
-            }
-            .grid.grid-cols-2.md\:grid-cols-4 p {
-                font-size: 0.9rem;
-            }
-            .grid.grid-cols-2.md\:grid-cols-4 span {
-                font-size: 0.9rem;
-            }
-
-            /* Hands Sections */
-            .mb-8.text-center {
-                margin-bottom: 1rem; /* Reduced from 2rem (mb-8) */
-            }
-            h2 {
-                margin-bottom: 0.5rem; /* Reduced from 0.5rem (mb-2) */
-                font-size: 1.25rem; /* Smaller section titles */
-            }
-            .card-container {
-                min-height: 100px; /* Adjust min-height for smaller cards */
-            }
-            .card {
-                width: 55px; /* Slightly smaller cards on mobile */
-                height: 85px;
-                padding: 0.3rem;
-            }
-            .card-value {
-                font-size: 1.1rem;
-            }
-            .card-suit-top, .card-suit-bottom {
-                font-size: 0.6rem;
-            }
-
-            /* Game Message */
             #game-message {
-                margin-bottom: 0.75rem; /* Reduced from 1rem (mb-4) */
                 font-size: 1rem; /* Smaller font on mobile */
             }
-
-            /* Buttons */
-            .flex.flex-wrap.justify-center.gap-4.mt-6 {
-                margin-top: 1rem; /* Reduced from 1.5rem (mt-6) */
-                gap: 0.5rem; /* Reduced gap between buttons */
+            /* Advice message will now be in the modal, so no direct styling here */
+            .card {
+                width: 60px; /* Slightly smaller cards on mobile */
+                height: 90px;
+            }
+            .card-value {
+                font-size: 1.2rem;
+            }
+            .card-suit-top, .card-suit-bottom {
+                font-size: 0.7rem;
+            }
+        }
+        /* Adjust overall padding for very small screens if content is too cramped */
+        @media (max-width: 480px) {
+            body {
+                padding: 0.5rem;
+            }
+            .bg-gray-800 {
+                padding: 0.75rem;
+            }
+            .text-4xl {
+                font-size: 2.5rem; /* Smaller title */
+            }
+            .text-2xl {
+                font-size: 1.5rem; /* Smaller section titles */
+            }
+            .flex-wrap {
+                justify-content: space-around; /* Distribute buttons better */
             }
             button {
-                padding: 0.5rem 0.9rem; /* Smaller button padding */
-                font-size: 0.85rem;
+                padding: 0.6rem 1rem; /* Smaller button padding */
+                font-size: 0.9rem;
             }
         }
     </style>
@@ -541,7 +492,7 @@
         const DOM = uiCtrl.getDOMstrings();
         // === IMPORTANT CHANGE HERE ===
         // Replace this with your actual Ngrok URL (e.g., https://6eaaaa34f751.ngrok-free.app)
-        const BASE_URL = 'https://6eaaaa34f751.ngrok-free.app'; 
+        const BASE_URL = 'https://6ee6d7164154.ngrok-free.app'; 
 
         let currentGameState = {}; // Store the current game state fetched from backend
 
@@ -562,7 +513,6 @@
 
         async function postAction(endpoint, payload = {}) {
             try {
-                uiCtrl.clearAdvice(); // Clear advice modal before new action
                 const response = await fetch(`${BASE_URL}/${endpoint}`, {
                     method: 'POST',
                     headers: {
