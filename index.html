@@ -693,7 +693,7 @@
 
 
     // --- MODULE PATTERN: APP CONTROLLER ---
-    const appController = (function(gameCtrl, uiCtrl, strategyCtrl) {
+    const appController = (function(gameCtrl, uiCtrl, strategyCtrl) { // Added strategyCtrl to params
 
         const DOM = uiCtrl.getDOMstrings();
         const BACKEND_URL = 'http://localhost:3000'; // Your local backend server URL
@@ -817,7 +817,6 @@
             if (!currentHand || !currentHand.isActive || currentFrontendGameState.round.isOver) return;
 
             // Evaluate strategy BEFORE sending to backend, as advice is frontend-only
-            // FIX: Pass playerHand.cards for strategy advice, not initialHandForStrategy
             evaluatePlayerAction(currentHand, currentFrontendGameState.round.dealerHand.cards[0], actionType);
 
             uiCtrl.displayGameMessage(`Processing ${actionType}...`);
@@ -981,6 +980,7 @@
         }
 
         // This function remains on the frontend to provide detailed reasons for strategy advice.
+        // It has been updated to match the logic from your provided index.html file.
         function generateEnhancedReason(recommended, incorrectAction, playerHand, dealerUpCard, gameConfig) {
             const playerScore = strategyCtrl.calculateScore(playerHand.cards);
             const dealerValue = (dealerUpCard.value === 'A') ? 11 : (['K', 'Q', 'J'].includes(dealerUpCard.value) ? 10 : parseInt(dealerUpCard.value));
@@ -988,10 +988,53 @@
             const isPair = playerHand.cards.length === 2 && playerHand.cards[0].value === playerHand.cards[1].value;
             const pVal = isPair ? playerHand.cards[0].value : null;
 
-            let reason = `<strong>${recommended.reason}</strong> `; // Start with the basic reason
+            let reason = `<strong>${recommended.reason}</strong> `;
 
-            // Add specific contextual reasons for common incorrect plays
-            if (recommended.action === 'Stand' && incorrectAction === 'Hit') {
+            if (pVal === 'A' && incorrectAction === 'Hit' && recommended.action === 'Split') {
+                reason += `You should always Split Aces. This gives you two strong chances at Blackjack.`;
+            } else if (pVal === 'A' && incorrectAction === 'Stand' && recommended.action === 'Split') {
+                reason += `You should always Split Aces. Standing on a soft 12 or 2 is a very weak position.`;
+            } else if (pVal === 'A' && incorrectAction === 'Double' && recommended.action === 'Split') {
+                reason += `You should always Split Aces. Doubling on a soft 12 is a poor play.`;
+            } else if (pVal === '10' && incorrectAction === 'Split' && recommended.action === 'Stand') {
+                reason += `Never split 10s. You already have a strong hand of 20. Splitting would likely weaken your position.`;
+            } else if (pVal === '10' && incorrectAction === 'Hit' && recommended.action === 'Stand') {
+                reason += `Never hit a hard 20. You already have a winning hand.`;
+            } else if (pVal === '10' && incorrectAction === 'Double' && recommended.action === 'Stand') {
+                reason += `Never double a hard 20. You already have a winning hand.`;
+            } else if (pVal === '9' && incorrectAction === 'Hit' && recommended.action === 'Split') {
+                reason += `While hitting a hard 18 is safe, the dealer's ${dealerValue} is a weak position. Splitting is a better play here, giving you two separate chances to beat them.`;
+            } else if (pVal === '9' && incorrectAction === 'Stand' && recommended.action === 'Split') {
+                reason += `While standing on a hard 18 is safe, the dealer's ${dealerValue} is a weak position. Splitting is a better play here, giving you two separate chances to beat them.`;
+            } else if (pVal === '9' && incorrectAction === 'Double' && recommended.action === 'Split') {
+                reason += `You should Split 9s against a dealer's ${dealerValue} to maximize your chances. Doubling on 18 is not optimal.`;
+            } else if (pVal === '9' && incorrectAction === 'Split' && recommended.action === 'Stand') {
+                reason += `You should Stand on 18 against a dealer's ${dealerValue}. Splitting 9s against a strong dealer card (7, 10, A) is not recommended.`;
+            } else if (pVal === '8' && incorrectAction !== 'Split') {
+                reason += `A hard 16 (two 8s) is the worst possible hand. By Splitting, you break it up and start two new, more promising hands with a base of 8.`;
+            } else if (pVal === '7' && incorrectAction === 'Split' && recommended.action === 'Hit') {
+                reason += `Don't split 7s against a strong dealer up-card (8+). You would turn one weak hand (14) into two even weaker ones.`;
+            } else if (pVal === '7' && incorrectAction === 'Hit' && recommended.action === 'Split') {
+                reason += `While hitting a hard 14 is an option, the dealer's ${dealerValue} is a weak position. Splitting is a better play here, giving you two separate chances to beat them.`;
+            } else if (pVal === '6' && incorrectAction === 'Split' && recommended.action === 'Hit') {
+                reason += `Don't split 6s against a strong dealer up-card (7+). You would turn one weak hand (12) into two even weaker ones.`;
+            } else if (pVal === '6' && incorrectAction === 'Hit' && recommended.action === 'Split') {
+                 reason += `While hitting a hard 12 is an option, the dealer's ${dealerValue} is a weak position. Splitting is a better play here, giving you two separate chances to beat them.`;
+            } else if (pVal === '5' && incorrectAction === 'Split') {
+                reason = `<strong>${recommended.reason}</strong> A pair of 5s makes a hard 10, which is one of the best starting hands. Splitting wastes this powerful opportunity by turning it into two very weak hands starting with 5. You should have treated it as a 10 and either Doubled (vs dealer 2-9) or Hit (vs dealer 10/Ace).`;
+            } else if (pVal === '4' && incorrectAction === 'Split' && recommended.action === 'Hit') {
+                reason += `Splitting is too risky here. You would be creating two very weak hands (starting with 4) against a dealer who is not in a bust-prone position. The correct defensive play is to Hit.`;
+            } else if (pVal === '4' && incorrectAction === 'Hit' && recommended.action === 'Split') {
+                reason += `While hitting an 8 is safe, the dealer is in their weakest position when showing a ${dealerValue}. This is the one time it is profitable to be aggressive and Split your 4s.`;
+            } else if (pVal === '3' && incorrectAction === 'Split' && recommended.action === 'Hit') {
+                reason += `Splitting is too risky here. You would be creating two very weak hands (starting with 3) against a dealer's strong ${dealerValue}. The correct defensive play is to Hit.`;
+            } else if (pVal === '3' && incorrectAction === 'Hit' && recommended.action === 'Split') {
+                reason += `While hitting a hard 6 is safe, the dealer's ${dealerValue} is a weak position. Splitting is a better play here, giving you two separate chances to beat them.`;
+            } else if (pVal === '2' && incorrectAction === 'Split' && recommended.action === 'Hit') {
+                reason += `Splitting is too risky here. You would be creating two very weak hands (starting with 2) against a dealer's strong ${dealerValue}. The correct defensive play is to Hit.`;
+            } else if (pVal === '2' && incorrectAction === 'Hit' && recommended.action === 'Split') {
+                reason += `While hitting a hard 4 is safe, the dealer's ${dealerValue} is a weak position. Splitting is a better play here, giving you two separate chances to beat them.`;
+            } else if (recommended.action === 'Stand' && incorrectAction === 'Hit') {
                 if (playerScore >= 17) {
                     reason = `<strong>${recommended.reason}</strong> Hitting a hard ${playerScore} is extremely risky as you are very likely to bust. The correct play is to Stand regardless of the dealer's card.`;
                 } else {
@@ -1016,32 +1059,6 @@
                 reason += `While hitting is safe, your ${handType} ${playerScore} is a great opportunity against the dealer's ${dealerValue}. You should Double to maximize your potential winnings.`;
             } else if (recommended.action === 'Double' && incorrectAction === 'Stand') {
                 reason += `Standing on ${playerScore} is too conservative. This is a powerful starting hand against the dealer's ${dealerValue}, and you should Double Down to maximize your potential winnings.`;
-            } else if (recommended.action === 'Stand' && incorrectAction === 'Split') {
-                reason += `Your hand of ${playerScore} is already strong. Splitting against a dealer's ${dealerValue} is risky because you could turn one winning hand into two weaker ones.`;
-            } else if (pVal === '8' && incorrectAction !== 'Split') {
-                reason += `A hard 16 is the worst possible hand. By Splitting, you break it up and start two new, more promising hands with a base of 8.`;
-            } else if (pVal === '7' && incorrectAction === 'Split' && recommended.action === 'Hit') {
-                reason += `Don't split 7s against a strong dealer up-card (8+). You would turn one weak hand (14) into two even weaker ones.`;
-            } else if (pVal === '7' && incorrectAction === 'Hit' && recommended.action === 'Split') {
-                reason += `While hitting a hard 14 is an option, the dealer's ${dealerValue} is a weak position. Splitting is a better play here, giving you two separate chances to beat them.`;
-            } else if (pVal === '6' && incorrectAction === 'Split' && recommended.action === 'Hit') {
-                reason += `Don't split 6s against a strong dealer up-card (7+). You would turn one weak hand (12) into two even weaker ones.`;
-            } else if (pVal === '6' && incorrectAction === 'Hit' && recommended.action === 'Split') {
-                 reason += `While hitting a hard 12 is an option, the dealer's ${dealerValue} is a weak position. Splitting is a better play here, giving you two separate chances to beat them.`;
-            } else if (pVal === '5' && incorrectAction === 'Split') {
-                reason = `<strong>${recommended.reason}</strong> A pair of 5s makes a hard 10, which is one of the best starting hands. Splitting wastes this powerful opportunity by turning it into two very weak hands starting with 5. You should have treated it as a 10 and either Doubled (vs dealer 2-9) or Hit (vs dealer 10/Ace).`;
-            } else if (pVal === '4' && incorrectAction === 'Split' && recommended.action === 'Hit') {
-                reason += `Splitting is too risky here. You would be creating two very weak hands (starting with 4) against a dealer who is not in a bust-prone position. The correct defensive play is to Hit.`;
-            } else if (pVal === '4' && incorrectAction === 'Hit' && recommended.action === 'Split') {
-                reason += `While hitting an 8 is safe, the dealer is in their weakest position when showing a ${dealerValue}. This is the one time it is profitable to be aggressive and Split your 4s.`;
-            } else if (pVal === '3' && incorrectAction === 'Split' && recommended.action === 'Hit') {
-                reason += `Splitting is too risky here. You would be creating two very weak hands (starting with 3) against a dealer's strong ${dealerValue}. The correct defensive play is to Hit.`;
-            } else if (pVal === '3' && incorrectAction === 'Hit' && recommended.action === 'Split') {
-                reason += `While hitting a hard 6 is safe, the dealer's ${dealerValue} is a weak position. Splitting is a better play here, giving you two separate chances to beat them.`;
-            } else if (pVal === '2' && incorrectAction === 'Split' && recommended.action === 'Hit') {
-                reason += `Splitting is too risky here. You would be creating two very weak hands (starting with 2) against a dealer's strong ${dealerValue}. The correct defensive play is to Hit.`;
-            } else if (pVal === '2' && incorrectAction === 'Hit' && recommended.action === 'Split') {
-                reason += `While hitting a hard 4 is safe, the dealer's ${dealerValue} is a weak position. Splitting is a better play here, giving you two separate chances to beat them.`;
             } else {
                 // Generic fallback for any other uncovered scenario
                 return recommended.reason;
