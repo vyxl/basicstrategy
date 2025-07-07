@@ -228,8 +228,6 @@
 
     <script>
     // --- MODULE PATTERN: STRATEGY CONTROLLER ---
-    // This module remains on the frontend as it's for providing strategy advice,
-    // not for managing the authoritative game state.
     const strategyController = (function() {
         const h17PairSplittingStrategy = {
             'A': { always: 'Split', reason: 'Always split Aces.'},
@@ -454,8 +452,7 @@
             // setInitialState: function() { /* ... frontend will initialize its own state */ },
             // reshuffleShoe: function() { /* ... backend handles this */ },
             // dealCard: function() { /* ... backend handles this */ },
-            // determineGameResults: function() { /* ... backend handles this */ },
-            // getBasicStrategyAdvice: function() { /* ... strategyCtrl has this */ }
+            // determineGameResults: function() { /* ... backend handles this */ }
         };
     })();
 
@@ -971,10 +968,9 @@
 
             currentFrontendGameState.player.stats.strategyOpportunities++;
             const canDoubleOrSplit = playerHand.cards.length === 2;
-            // FIX: Pass playerHand.cards for strategy advice, not initialHandForStrategy
+            
             const recommended = strategyCtrl.getBasicStrategyAdvice(playerHand.cards, dealerUpCard, canDoubleOrSplit, gameConfig);
 
-            // FIX: Convert both to lowercase for case-insensitive comparison
             if (playerAction.toLowerCase() === recommended.action.toLowerCase()) {
                 currentFrontendGameState.player.stats.strategyCorrect++;
                 uiCtrl.displayAdvice(`Basic Strategy: <span class="advice-text-correct">Correct!</span> ${recommended.reason}`, 'correct');
@@ -992,8 +988,9 @@
             const isPair = playerHand.cards.length === 2 && playerHand.cards[0].value === playerHand.cards[1].value;
             const pVal = isPair ? playerHand.cards[0].value : null;
 
-            let reason = `<strong>${recommended.reason}</strong> `;
+            let reason = `<strong>${recommended.reason}</strong> `; // Start with the basic reason
 
+            // Add specific contextual reasons for common incorrect plays
             if (recommended.action === 'Stand' && incorrectAction === 'Hit') {
                 if (playerScore >= 17) {
                     reason = `<strong>${recommended.reason}</strong> Hitting a hard ${playerScore} is extremely risky as you are very likely to bust. The correct play is to Stand regardless of the dealer's card.`;
@@ -1046,6 +1043,7 @@
             } else if (pVal === '2' && incorrectAction === 'Hit' && recommended.action === 'Split') {
                 reason += `While hitting a hard 4 is safe, the dealer's ${dealerValue} is a weak position. Splitting is a better play here, giving you two separate chances to beat them.`;
             } else {
+                // Generic fallback for any other uncovered scenario
                 return recommended.reason;
             }
             
@@ -1054,8 +1052,8 @@
 
         return {
             init: function() {
-                console.log('Application has started. Connecting to backend...');
-                // Initialize frontend state
+                console.log('Application has started.');
+                // Initialize frontend state (no backend calls here, just local state)
                 currentFrontendGameState = gameCtrl.getGameState();
                 uiCtrl.renderInitialShoe(currentFrontendGameState.shoe);
                 updateFullUI();
