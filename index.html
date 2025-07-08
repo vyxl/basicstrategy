@@ -1,700 +1,898 @@
-<!DOCTYPE html>
-<html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Blackjack Basic Strategy Trainer</title>
-    <script src="https://cdn.tailwindcss.com"></script>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap" rel="stylesheet">
-    <style>
-        body {
-            font-family: 'Inter', sans-serif;
-        }
-        .card-container {
-            display: flex;
-            gap: 0.5rem;
-            min-height: 120px; /* Ensure space for cards */
-            flex-wrap: wrap;
-            justify-content: center;
-        }
-        .card {
-            background-color: #f7fafc; /* White card background */
-            color: #2d3748; /* Dark text for cards */
-            border-radius: 0.5rem;
-            padding: 0.5rem;
-            width: 70px;
-            height: 100px;
-            display: flex;
-            flex-direction: column;
-            justify-content: space-between;
-            align-items: center;
-            font-weight: bold;
-            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
-            border: 1px solid #cbd5e0;
-            flex-shrink: 0; /* Prevent cards from shrinking */
-        }
-        .card.red {
-            color: #e53e3e; /* Red for Hearts/Diamonds */
-        }
-        .card-suit-top, .card-suit-bottom {
-            font-size: 0.8rem;
-        }
-        .card-value {
-            font-size: 1.5rem;
-        }
-        .card-back {
-            background-color: #2b6cb0;
-            background-image: url("data:image/svg+xml,%3Csvg width='10' height='10' viewBox='0 0 10 10' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='M-1 1l2-2M0 10l10-10M9 11l2-2' stroke='%2363b3ed' stroke-width='1'/%3E%3C/svg%3E");
-            background-size: 10px 10px;
-        }
-        /* Card Counting Hues */
-        .card-count-positive {
-            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1), inset 0 0 12px 3px rgba(59, 130, 246, 0.5);
-        }
-        .card-count-negative {
-            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1), inset 0 0 12px 3px rgba(239, 68, 68, 0.5);
-        }
-        .advice-text-correct { color: #86efac; }
-        .advice-text-incorrect { color: #fca5a5; }
-        .advice-text-neutral { color: #bfdbfe; }
-        .balance-positive { color: #48bb78; }
-        .balance-negative { color: #e53e3e; }
-        .balance-neutral { color: #e2e8f0; }
-        .player-hand-wrapper {
-            border: 2px solid transparent;
-            padding: 0.5rem;
-            border-radius: 0.75rem;
-            transition: border-color 0.2s ease-in-out;
-        }
-        .player-hand-wrapper.active { border-color: #f6e05e; }
-        .player-hand-wrapper.busted { border-color: #e53e3e; }
-        .player-hand-wrapper.stood { border-color: #4299e1; }
-        .highlight-card {
-            border: 3px solid #f6e05e;
-            /* box-shadow removed to prevent override */
-        }
-        /* New rules to combine highlight and count hues */
-        .highlight-card.card-count-positive {
-            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1), inset 0 0 12px 3px rgba(59, 130, 246, 0.5), 0 0 10px rgba(246, 224, 94, 0.7);
-        }
-        .highlight-card.card-count-negative {
-            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1), inset 0 0 12px 3px rgba(239, 68, 68, 0.5), 0 0 10px rgba(246, 224, 94, 0.7);
-        }
-        #shoe-display-container {
-            width: 250px;
-            height: 30px; /* Increased height to make room for shadow */
-            background-image: linear-gradient(to bottom, #4b5563, #374151);
-            border: 2px solid #4b5563;
-            border-radius: 0.5rem;
-            box-shadow: inset 0 0 10px rgba(0,0,0,0.5);
-            position: relative;
-            overflow: hidden;
-        }
-        #shoe-visual {
-            height: calc(100% - 5px); /* Make room for shadow */
-            background-image: repeating-linear-gradient(
-                to right,
-                #f7fafc,
-                #f7fafc 2px,
-                #d1d5db 2px,
-                #d1d5db 3px
-            );
-            border-radius: 0.25rem;
-            position: absolute;
-            top: 0;
-            left: 0;
-            box-shadow: 0 1px 0 #d1d5db, 0 2px 0 #d1d5db, 0 3px 0 #d1d5db, 0 4px 0 #d1d5db, 0 5px 6px rgba(0,0,0,0.2);
-            transition: width 0.5s ease-out;
-            border: 1px solid #cbd5e0;
-            box-sizing: border-box;
-        }
-        #cut-card-visual {
-            height: 100%;
-            width: 4px;
-            background-color: #ef4444;
-            position: absolute;
-            top: 0;
-            border-radius: 1px;
-            box-shadow: 0 0 5px rgba(239, 68, 68, 0.5);
-            z-index: 10;
-            transition: left 0.5s ease-out;
-        }
-        .dealing-card {
-            position: absolute;
-            z-index: 100;
-            transition: all 0.5s ease-in-out;
-        }
-        #game-rules-content {
-            overflow: hidden;
-            transition: max-height 0.5s ease-in-out, padding 0.5s ease-in-out;
-            padding-top: 0.5rem;
-        }
-        #game-rules-container.collapsed #game-rules-content {
-            max-height: 0;
-            padding-top: 0;
-            padding-bottom: 0;
-        }
-        #game-rules-container:not(.collapsed) #game-rules-content {
-            max-height: 500px;
-        }
-        #game-rules-toggle-icon {
-            display: inline-block;
-            transition: transform 0.3s ease-in-out;
-        }
-        #game-rules-container.collapsed #game-rules-toggle-icon {
-            transform: rotate(-90deg);
-        }
+# app.py (Flask Backend)
 
-        /* Modal Overlay */
-        .modal-overlay {
-            position: fixed;
-            top: 0;
-            left: 0;
-            width: 100%;
-            height: 100%;
-            background-color: rgba(0, 0, 0, 0.7);
-            display: flex;
-            justify-content: center;
-            align-items: center;
-            z-index: 1000;
-            opacity: 0;
-            visibility: hidden;
-            transition: opacity 0.3s ease-in-out, visibility 0.3s ease-in-out;
-        }
-        .modal-overlay.show {
-            opacity: 1;
-            visibility: visible;
-        }
+from flask import Flask, request, jsonify
+from flask_cors import CORS
+import random
 
-        /* Modal Content */
-        .modal-content {
-            background-color: #2d3748; /* Dark background for modal */
-            padding: 1.5rem;
-            border-radius: 0.75rem;
-            box-shadow: 0 8px 16px rgba(0, 0, 0, 0.3);
-            max-width: 90%;
-            width: 400px;
-            text-align: center;
-            position: relative;
-        }
-        .modal-close-button {
-            position: absolute;
-            top: 0.5rem;
-            right: 0.5rem;
-            background: none;
-            border: none;
-            font-size: 1.5rem;
-            color: #cbd5e0;
-            cursor: pointer;
-            padding: 0.2rem 0.5rem;
-            border-radius: 0.25rem;
-            transition: background-color 0.2s ease-in-out, color 0.2s ease-in-out;
-        }
-        .modal-close-button:hover {
-            background-color: rgba(255, 255, 255, 0.1);
-            color: #f7fafc;
-        }
+app = Flask(__name__)
+CORS(app) # Enable CORS for all routes
 
-        /* === MOBILE-SPECIFIC VERTICAL SPACING & FONT ADJUSTMENTS === */
-        @media (max-width: 768px) {
-            /* General container padding */
-            .bg-gray-800 {
-                padding: 0.75rem; /* Reduced from 1.5rem */
-            }
+# --- CONSTANTS ---
+SUITS = ['♠', '♥', '♦', '♣']
+VALUES = ['2', '3', '4', '5', '6', '7', '8', '9', '10', 'J', 'Q', 'K', 'A']
 
-            /* Title */
-            h1 {
-                margin-bottom: 0.75rem; /* Reduced from 1.5rem (mb-6) */
-                font-size: 2.25rem; /* Slightly smaller title */
-            }
+# --- GAME CONFIGURATION OBJECT ---
+GAME_CONFIG = {
+    'dealerHitsOnSoft17': True,
+    'blackjackPayout': 1.5,
+    'maxHandsAfterSplitting': 4,
+}
 
-            /* Game Rules */
-            #game-rules-container {
-                margin-bottom: 0.75rem; /* Reduced from 2rem (mb-8) */
-                padding: 0.5rem; /* Reduced from 0.75rem (p-3) */
-            }
-            #game-rules-header {
-                font-size: 1rem; /* Smaller font */
-            }
-            #game-rules-content p {
-                font-size: 0.75rem; /* Smaller font */
-            }
+# --- CENTRAL GAME STATE (Global for simplicity in this example) ---
+# In a real application, you might use a database or session management for multiple users.
+game_state = {}
 
-            /* Controls & Shoe Display */
-            .flex.flex-col.md\:flex-row.justify-center.md\:justify-around.items-center.gap-4.mb-6 {
-                margin-bottom: 0.75rem; /* Reduced from 1.5rem (mb-6) */
-                gap: 0.5rem; /* Reduced gap between elements */
+# --- STRATEGY TABLES (Corrected Syntax) ---
+H17_PAIR_SPLITTING_STRATEGY = {
+    'A': {'always': 'Split', 'reason': 'Always split Aces.'},
+    '10': {'always': 'Stand', 'reason': 'Never split, hit, or double down on 10s.'},
+    '9': {'splitVs': [2, 3, 4, 5, 6, 8, 9], 'else': 'Stand', 'reason': 'Split 9s vs dealer 2-6, 8-9; Stand vs 7, 10, A.'},
+    '8': {'always': 'Split', 'reason': 'Always split 8s.'},
+    '7': {'splitVs': [2, 3, 4, 5, 6, 7], 'else': 'Hit', 'reason': 'Split 7s vs dealer 2-7; Hit vs 8-A.'},
+    '6': {'splitVs': [2, 3, 4, 5, 6], 'else': 'Hit', 'reason': 'Split 6s vs dealer 2-6; Hit vs 7-A.'},
+    '5': {'always': 'NoSplit', 'reason': 'Never split 5s; treat as a hard 10.'},
+    '4': {'splitVs': [5, 6], 'else': 'Hit', 'reason': 'Split 4s vs dealer 5-6; otherwise, Hit.'},
+    '3': {'splitVs': [2, 3, 4, 5, 6, 7], 'else': 'Hit', 'reason': 'Split 3s vs dealer 2-7; Hit vs 8-A.'},
+    '2': {'splitVs': [2, 3, 4, 5, 6, 7], 'else': 'Hit', 'reason': 'Split 2s vs dealer 2-7; otherwise, Hit.'},
+}
+
+H17_SOFT_TOTALS_STRATEGY = {
+    '20': {'always': 'Stand', 'reason': 'Always stand on soft 20.'},
+    '19': {'always': 'Stand', 'reason': 'Always stand on soft 19.'},
+    '18': {'doubleVs': [2, 3, 4, 5, 6], 'standVs': [7, 8], 'else': 'Hit', 'reason': 'Double soft 18 vs 2-6; Stand vs 7-8; Hit vs 9-A.'},
+    '17': {'doubleVs': [3, 4, 5, 6], 'else': 'Hit', 'reason': 'Double soft 17 vs 3-6; otherwise, Hit.'},
+    '16': {'doubleVs': [4, 5, 6], 'else': 'Hit', 'reason': 'Double soft 16 vs 4-6; otherwise, Hit.'},
+    '15': {'doubleVs': [4, 5, 6], 'else': 'Hit', 'reason': 'Double soft 15 vs 4-6; otherwise, Hit.'},
+    '14': {'doubleVs': [5, 6], 'else': 'Hit', 'reason': 'Double soft 14 vs 5-6; otherwise, Hit.'},
+    '13': {'doubleVs': [5, 6], 'else': 'Hit', 'reason': 'Double soft 13 vs 5-6; otherwise, Hit.'},
+}
+
+H17_HARD_TOTALS_STRATEGY = {
+    '17': {'always': 'Stand', 'reason': 'Always stand on hard 17+.'},
+    '16': {'standVs': [2, 3, 4, 5, 6], 'else': 'Hit', 'reason': 'Stand on hard 16 vs 2-6; Hit vs 7-A.'},
+    '15': {'standVs': [2, 3, 4, 5, 6], 'else': 'Hit', 'reason': 'Stand on hard 15 vs 2-6; Hit vs 7-A.'},
+    '14': {'standVs': [2, 3, 4, 5, 6], 'else': 'Hit', 'reason': 'Stand on hard 14 vs 2-6; Hit vs 7-A.'},
+    '13': {'standVs': [2, 3, 4, 5, 6], 'else': 'Hit', 'reason': 'Stand on hard 13 vs 2-6; Hit vs 7-A.'},
+    '12': {'standVs': [4, 5, 6], 'else': 'Hit', 'reason': 'Stand on hard 12 vs 4-6; Hit vs 2-3, 7-A.'},
+    '11': {'always': 'Double', 'reason': 'Always double on hard 11.'},
+    '10': {'doubleVs': [2, 3, 4, 5, 6, 7, 8, 9], 'else': 'Hit', 'reason': 'Double on 10 vs 2-9; Hit vs 10, A.'},
+    '9': {'doubleVs': [3, 4, 5, 6], 'else': 'Hit', 'reason': 'Double on 9 vs dealer 3-6; otherwise, Hit.'},
+}
+
+STRATEGY_TABLES = {
+    'pairs': H17_PAIR_SPLITTING_STRATEGY,
+    'soft': H17_SOFT_TOTALS_STRATEGY,
+    'hard': H17_HARD_TOTALS_STRATEGY
+}
+
+# --- GAME LOGIC FUNCTIONS (Translated from original JS) ---
+
+def create_deck(num_decks):
+    """Creates and shuffles a new deck of cards."""
+    new_deck = []
+    for _ in range(num_decks):
+        for suit in SUITS:
+            for value in VALUES:
+                new_deck.append({'value': value, 'suit': suit, 'isHighlighted': False}) # Add isHighlighted default
+    random.shuffle(new_deck)
+    return new_deck
+
+def place_cut_card():
+    """Places the cut card randomly in the shoe."""
+    min_pos = int(game_state['shoe']['totalCards'] * 0.75)
+    max_pos = int(game_state['shoe']['totalCards'] * 0.85)
+    game_state['shoe']['cutCardPosition'] = random.randint(min_pos, max_pos)
+
+def get_initial_state(shoe_size=6):
+    """Returns the initial game state."""
+    # This function defines the *base* structure for a new game state.
+    # feedbackMode is now initialized separately in set_initial_state to persist.
+    return {
+        'deck': [],
+        'shoe': {
+            'size': shoe_size,
+            'totalCards': shoe_size * 52,
+            'cardsDealt': 0,
+            'cutCardPosition': 0,
+            'showShuffledMessage': False,
+        },
+        'counts': {
+            'running': 0,
+            'true': 0.0,
+            'decksRemaining': float(shoe_size),
+        },
+        'round': {
+            'betAmount': 10,
+            'playerHands': [],
+            'dealerHand': [],
+            'currentHandIndex': 0,
+            'isOver': True,
+            'dealerHadBlackjack': False,
+            'dealerScore': 0, # Added for backend calculation
+        },
+        'player': {
+            'totalBalance': 0,
+            'stats': {
+                'handsPlayed': 0,
+                'handsWon': 0,
+                'strategyOpportunities': 0,
+                'strategyCorrect': 0,
+                'handsWonPct': 0.0, # Added for backend calculation
+                'strategyCorrectPct': 0.0, # Added for backend calculation
             }
-            .flex.flex-col.md\:flex-row > div {
-                margin-bottom: 0.4rem; /* Add some spacing between stacked elements */
-            }
-            .flex.flex-col.md\:flex-row > div:last-child {
-                margin-bottom: 0;
-            }
-            label {
-                font-size: 0.9rem; /* Smaller label font */
-            }
-            select, input[type="number"] {
-                padding: 0.3rem; /* Smaller padding for inputs/selects */
-                font-size: 0.85rem; /* Smaller font */
-            }
-            #shoe-display-container {
-                width: 200px; /* Slightly narrower shoe display */
-                height: 25px;
-            }
-            #shuffled-message {
-                font-size: 0.75rem; /* Smaller font */
-            }
+        },
+        'ui': {
+            'message': "Place your bet and click 'Deal New Hand' to start.",
+            'advice': {'text': "", 'type': "neutral"},
+            'dealerDisplayScore': 0, # Added for backend calculation
+            'buttons': { # Added for backend calculation
+                'deal': True, 'hit': False, 'stand': False, 'double': False, 'split': False
+            },
+            'playerHandsHtml': '', # New: HTML for player hands
+            'dealerHandHtml': '',  # New: HTML for dealer hand
+            # 'feedbackMode' is REMOVED from here to persist across hands
+        },
+        'gameConfig': GAME_CONFIG # Expose game config to frontend for split rules etc.
+    }
+
+def set_initial_state(shoe_size=6):
+    """Sets the initial game state and initializes persistent UI elements."""
+    global game_state
+    # Capture current feedback mode before resetting the rest of the state
+    current_feedback_mode = game_state.get('ui', {}).get('feedbackMode', 'all') 
+    
+    game_state = get_initial_state(shoe_size)
+    
+    # Reapply the feedback mode after resetting, or set default if first time
+    game_state['ui']['feedbackMode'] = current_feedback_mode
+    
+    print(f"[DEBUG] set_initial_state: Feedback Mode set to {game_state['ui']['feedbackMode']}")
+    _update_derived_ui_state() # Update UI elements immediately
+
+def reshuffle_shoe():
+    """Reshuffles the shoe."""
+    game_state['deck'] = create_deck(game_state['shoe']['size'])
+    game_state['shoe']['totalCards'] = game_state['shoe']['size'] * 52
+    place_cut_card()
+    game_state['shoe']['cardsDealt'] = 0
+    game_state['counts']['running'] = 0
+    game_state['shoe']['showShuffledMessage'] = True
+    _update_derived_ui_state() # Update UI elements immediately
+
+def update_running_count(card):
+    """Updates the running count based on the card dealt."""
+    val = card['value']
+    if val in ['2', '3', '4', '5', '6']:
+        game_state['counts']['running'] += 1
+    elif val in ['10', 'J', 'Q', 'K', 'A']:
+        game_state['counts']['running'] -= 1
+
+def deal_card():
+    """Deals a card from the deck."""
+    if not game_state['deck']:
+        reshuffle_shoe() # Ensure deck is not empty
+    game_state['shoe']['cardsDealt'] += 1
+    card = game_state['deck'].pop()
+    update_running_count(card) # Update count immediately after dealing
+    return card
+
+def calculate_score(hand_cards):
+    """Calculates the score of a hand."""
+    score = 0
+    num_aces = 0
+    for card in hand_cards:
+        if card['value'] == 'A':
+            num_aces += 1
+            score += 11
+        elif card['value'] in ['K', 'Q', 'J']:
+            score += 10
+        else:
+            score += int(card['value'])
+    while score > 21 and num_aces > 0:
+        score -= 10
+        num_aces -= 1
+    return score
+
+def start_new_hand(bet_amount):
+    """Starts a new hand."""
+    # Only reset the 'round' specific state, not the entire game_state or UI
+    # This preserves feedbackMode, totalBalance, and player stats
+    # We create a temporary initial state to get the 'round' part without affecting 'ui'
+    temp_initial_state = get_initial_state(game_state['shoe']['size'])
+    game_state['round'] = temp_initial_state['round'] # Use the 'round' part
+    
+    game_state['round']['betAmount'] = bet_amount
+    game_state['round']['isOver'] = False
+    game_state['ui']['message'] = "Your turn. What's your move?" # Default message for new hand
+    game_state['ui']['advice'] = {'text': '', 'type': 'neutral'} # Clear advice for new hand
+
+    initial_player_hand = {
+        'cards': [], 'score': 0, 'bet': game_state['round']['betAmount'], 'isActive': True,
+        'hasDoubledDown': False, 'isBlackjack': False, 'isSplitAce': False,
+        'initialHandForStrategy': [], 'outcome': None, 'winnings': None
+    }
+    game_state['round']['playerHands'].append(initial_player_hand)
+    _update_derived_ui_state()
+
+def determine_game_results():
+    """Determines the results of the game."""
+    dealer_final_score = calculate_score(game_state['round']['dealerHand'])
+    game_state['round']['dealerScore'] = dealer_final_score # Store final dealer score
+
+    for hand in game_state['round']['playerHands']:
+        game_state['player']['stats']['handsPlayed'] += 1
+        if hand['outcome'] is None: # Only determine outcome if not already set (e.g., by bust)
+            if hand['score'] > 21:
+                hand['outcome'] = 'lose'
+            elif dealer_final_score > 21:
+                hand['outcome'] = 'win'
+            elif hand['score'] > dealer_final_score:
+                hand['outcome'] = 'win'
+            elif hand['score'] < dealer_final_score:
+                hand['outcome'] = 'lose'
+            else:
+                hand['outcome'] = 'push'
+
+        if hand['outcome'] == 'win':
+            game_state['player']['stats']['handsWon'] += 1
+            hand['winnings'] = hand['bet'] * GAME_CONFIG['blackjackPayout'] if hand['isBlackjack'] else hand['bet']
+        elif hand['outcome'] == 'lose':
+            hand['winnings'] = -hand['bet']
+        else:
+            hand['winnings'] = 0
+        game_state['player']['totalBalance'] += hand['winnings']
+    _update_derived_ui_state()
+
+def get_basic_strategy_advice(player_hand_cards, dealer_up_card, can_double_or_split):
+    """Provides basic strategy advice."""
+    player_score = calculate_score(player_hand_cards)
+    dealer_value = 11 if dealer_up_card['value'] == 'A' else (10 if dealer_up_card['value'] in ['K', 'Q', 'J'] else int(dealer_up_card['value']))
+
+    is_pair = can_double_or_split and player_hand_cards[0]['value'] == player_hand_cards[1]['value']
+    has_ace = any(card['value'] == 'A' for card in player_hand_cards)
+    is_soft = has_ace and (calculate_score([c for c in player_hand_cards if c['value'] != 'A']) + 11) == player_score
+
+    strat = None
+    p_val = None
+    score_key = None
+
+    if is_pair:
+        p_val = '10' if player_hand_cards[0]['value'] in ['J', 'Q', 'K'] else player_hand_cards[0]['value']
+        strat = STRATEGY_TABLES['pairs'].get(p_val)
+
+        if strat:
+            if 'always' in strat:
+                if strat['always'] == 'NoSplit': # falls through to hard total logic
+                    pass
+                else:
+                    return {'action': strat['always'], 'reason': strat['reason']}
+            elif dealer_value in strat['splitVs']:
+                return {'action': 'Split', 'reason': strat['reason']}
+            else:
+                return {'action': strat['else'], 'reason': strat['reason']}
+
+    if is_soft:
+        strat = STRATEGY_TABLES['soft'].get(str(player_score))
+        if strat:
+            if 'always' in strat:
+                return {'action': strat['always'], 'reason': strat['reason']}
+
+            if 'doubleVs' in strat and dealer_value in strat['doubleVs']:
+                if can_double_or_split:
+                    return {'action': 'Double', 'reason': strat['reason']}
+                else:
+                    return {'action': 'Hit', 'reason': 'Hit a multi-card soft hand.'}
+            if 'standVs' in strat and dealer_value in strat['standVs']:
+                return {'action': 'Stand', 'reason': strat['reason']}
+            return {'action': strat['else'], 'reason': strat['reason']}
+
+    # Hard totals (or if pair logic fell through for NoSplit)
+    score_key = '17' if player_score >= 17 else ('8' if player_score <= 8 else str(player_score))
+    strat = STRATEGY_TABLES['hard'].get(score_key)
+    if strat:
+        if 'always' in strat:
+            if strat['always'] == 'Double':
+                if can_double_or_split:
+                    return {'action': 'Double', 'reason': strat['reason']}
+                else:
+                    return {'action': 'Hit', 'reason': 'Hit a multi-card hard hand.'}
+            return {'action': strat['always'], 'reason': strat['reason']}
+
+        if 'doubleVs' in strat:
+            if dealer_value in strat['doubleVs']:
+                if can_double_or_split:
+                    return {'action': 'Double', 'reason': strat['reason']}
+                else:
+                    return {'action': 'Hit', 'reason': 'Hit a multi-card hard hand.'}
+            else:
+                 return {'action': strat['else'], 'reason': strat['reason']}
+
+        if 'standVs' in strat:
+            if dealer_value in strat['standVs']:
+                return {'action': 'Stand', 'reason': strat['reason']}
+            else:
+                return {'action': strat['else'], 'reason': strat['reason']}
+
+    return {'action': 'Hit', 'reason': f'Always hit on a hard total of {player_score}.'}
+
+def generate_enhanced_reason(recommended, incorrect_action, player_hand, dealer_up_card):
+    """Generates an enhanced reason for strategy advice."""
+    player_score = calculate_score(player_hand['cards'])
+    dealer_value = 11 if dealer_up_card['value'] == 'A' else (10 if dealer_up_card['value'] in ['K', 'Q', 'J'] else int(dealer_up_card['value']))
+    is_soft = any(c['value'] == 'A' for c in player_hand['cards']) and (calculate_score([c for c in player_hand['cards'] if c['value'] != 'A']) + 11) == player_score
+    is_pair = len(player_hand['cards']) == 2 and player_hand['cards'][0]['value'] == player_hand['cards'][1]['value']
+    p_val = player_hand['cards'][0]['value'] if is_pair else None
+
+    reason = f"<strong>{recommended['reason']}</strong> "
+
+    if recommended['action'] == 'Stand' and incorrect_action == 'Hit':
+        if player_score >= 17:
+            reason = f"<strong>{recommended['reason']}</strong> Hitting a hard {player_score} is extremely risky as you are very likely to bust. The correct play is to Stand regardless of the dealer's card."
+        else:
+            reason += f"In this case, hitting a hard {player_score} is risky. Since the dealer shows a weak card ({dealer_value}), they are more likely to bust. You should let the dealer take that risk."
+    elif recommended['action'] == 'Stand' and incorrect_action == 'Double':
+         if player_score >= 17:
+            reason += f"Doubling on a strong hand like {player_score} is an unnecessary risk. You should Stand to lock in your likely winning hand."
+         else:
+            reason += f"Doubling on a weak hand like {player_score} is far too risky, even against a dealer's bust card ({dealer_value}). The correct play is to Stand, taking no risk yourself, and let the dealer take the high probability of busting."
+    elif recommended['action'] == 'Hit' and incorrect_action == 'Stand':
+        reason += f"Here, standing on {player_score} is too weak against a dealer's {dealer_value}. You will likely lose unless you Hit for a better total."
+    elif recommended['action'] == 'Hit' and incorrect_action == 'Double':
+        if dealer_value in [2, 3]:
+            reason += f"Doubling is too risky against a dealer's {dealer_value}. Although it's a low card, the dealer is less likely to bust with a {dealer_value} than with other low cards (like 4, 5, or 6). The correct play is to Hit to improve your hand without risking more money against their safer position."
+        elif dealer_value in [7, 8, 9, 10, 11]: # Dealer has a strong up-card
+            reason += f"Doubling is too risky when the dealer shows a strong card like {dealer_value}. You shouldn't risk more money on a single card draw against their strong position."
+        else: # Fallback for other cases not explicitly covered, e.g., dealer 4, 5, 6
+            reason += f"Doubling is too risky when the dealer shows a {dealer_value}. The correct play is to Hit to improve your hand without risking more money."
+    elif recommended['action'] == 'Double' and incorrect_action == 'Hit':
+        hand_type = 'soft' if is_soft else 'hard'
+        reason += f"While hitting is safe, your {hand_type} {player_score} is a great opportunity against the dealer's {dealer_value}. You should Double to maximize your potential winnings."
+    elif recommended['action'] == 'Double' and incorrect_action == 'Stand':
+        reason += f"Standing on {player_score} is too conservative. This is a powerful starting hand against the dealer's {dealer_value}, and you should Double Down to maximize your potential winnings."
+    elif recommended['action'] == 'Stand' and incorrect_action == 'Split':
+        reason += f"Your hand of {player_score} is already strong. Splitting against a dealer's {dealer_value} is risky because you could turn one winning hand into two weaker ones."
+    elif p_val == '8' and incorrect_action != 'Split':
+        reason += f"A hard 16 is the worst possible hand. By Splitting, you break it up and start two new, more promising hands with a base of 8."
+    elif p_val == '7' and incorrect_action == 'Split' and recommended['action'] == 'Hit':
+        reason += f"Don't split 7s against a strong dealer up-card (8+). You would turn one weak hand (14) into two even weaker ones."
+    elif p_val == '7' and incorrect_action == 'Hit' and recommended['action'] == 'Split':
+        reason += f"While hitting a hard 14 is an option, the dealer's {dealer_value} is a weak position. Splitting is a better play here, giving you two separate chances to beat them."
+    elif p_val == '6' and incorrect_action == 'Split' and recommended['action'] == 'Hit':
+        reason += f"Don't split 6s against a strong dealer up-card (7+). You would turn one weak hand (12) into two even weaker ones."
+    elif p_val == '6' and incorrect_action == 'Hit' and recommended['action'] == 'Split':
+         reason += f"While hitting a hard 12 is an option, the dealer's {dealer_value} is a weak position. Splitting is a better play here, giving you two separate chances to beat them."
+    elif p_val == '5' and incorrect_action == 'Split':
+        reason = f"<strong>{recommended['reason']}</strong> A pair of 5s makes a hard 10, which is one of the best starting hands. Splitting wastes this powerful opportunity by turning it into two very weak hands starting with 5. You should have treated it as a 10 and either Doubled (vs dealer 2-9) or Hit (vs dealer 10/Ace)."
+    elif p_val == '4' and incorrect_action == 'Split' and recommended['action'] == 'Hit':
+        reason += f"Splitting is too risky here. You would be creating two very weak hands (starting with 4) against a dealer who is not in a bust-prone position. The correct defensive play is to Hit."
+    elif p_val == '4' and incorrect_action == 'Hit' and recommended['action'] == 'Split':
+        reason += f"While hitting an 8 is safe, the dealer is in their weakest position when showing a {dealer_value}. This is the one time it is profitable to be aggressive and Split your 4s."
+    elif p_val == '3' and incorrect_action == 'Split' and recommended['action'] == 'Hit':
+        reason += f"Splitting is too risky here. You would be creating two very weak hands (starting with 3) against a dealer's strong {dealer_value}. The correct defensive play is to Hit."
+    elif p_val == '3' and incorrect_action == 'Hit' and recommended['action'] == 'Split':
+        reason += f"While hitting a hard 6 is safe, the dealer's {dealer_value} is a weak position. Splitting is a better play here, giving you two separate chances to beat them."
+    elif p_val == '2' and incorrect_action == 'Split' and recommended['action'] == 'Hit':
+        reason += f"Splitting is too risky here. You would be creating two very weak hands (starting with 2) against a dealer's strong {dealer_value}. The correct defensive play is to Hit."
+    elif p_val == '2' and incorrect_action == 'Hit' and recommended['action'] == 'Split':
+        reason += f"While hitting a hard 4 is safe, the dealer's {dealer_value} is a weak position. Splitting is a better play here, giving you two separate chances to beat them."
+    else:
+        # Generic fallback for any other uncovered scenario
+        return recommended['reason']
+
+    return reason
+
+def evaluate_player_action(player_hand, dealer_up_card, player_action):
+    """Evaluates the player's action against basic strategy, considering feedback mode."""
+    # Always increment strategyOpportunities, regardless of feedback mode
+    game_state['player']['stats']['strategyOpportunities'] += 1
+
+    # If the hand is already over due to Blackjack or dealer Blackjack, no strategy advice is given
+    # However, we still want to show the specific Blackjack outcome message
+    if player_hand['isBlackjack'] or game_state['round']['dealerHadBlackjack'] or (player_hand['score'] == 21 and len(player_hand['cards']) > 2):
+        # Clear any previous advice, then allow deal_initial_cards_backend to set specific blackjack message
+        game_state['ui']['advice'] = {'text': '', 'type': 'neutral'}
+        return
+
+    # Determine recommended action
+    can_double_or_split = len(player_hand['cards']) == 2
+    recommended = get_basic_strategy_advice(player_hand['cards'], dealer_up_card, can_double_or_split)
+
+    # Check if the player's action was correct
+    is_correct = (player_action == recommended['action'])
+    if is_correct:
+        game_state['player']['stats']['strategyCorrect'] += 1
+
+    # Apply feedback mode logic
+    feedback_mode = game_state['ui']['feedbackMode']
+    print(f"[DEBUG] evaluate_player_action: Current Feedback Mode: {feedback_mode}")
+
+    if feedback_mode == 'all':
+        if is_correct:
+            game_state['ui']['advice'] = {'text': f'Basic Strategy: <span class="advice-text-correct">Correct!</span> {recommended["reason"]}', 'type': 'correct'}
+        else:
+            enhanced_reason = generate_enhanced_reason(recommended, player_action, player_hand, dealer_up_card)
+            game_state['ui']['advice'] = {'text': f'Basic Strategy: <span class="advice-text-incorrect">Incorrect!</span> You chose {player_action}. Optimal was {recommended["action"]}.<br>Reason: {enhanced_reason}', 'type': 'incorrect'}
+    elif feedback_mode == 'incorrect':
+        if not is_correct:
+            enhanced_reason = generate_enhanced_reason(recommended, player_action, player_hand, dealer_up_card)
+            game_state['ui']['advice'] = {'text': f'Basic Strategy: <span class="advice-text-incorrect">Incorrect!</span> You chose {player_action}. Optimal was {recommended["action"]}.<br>Reason: {enhanced_reason}', 'type': 'incorrect'}
+        else:
+            game_state['ui']['advice'] = {'text': '', 'type': 'neutral'} # Clear advice if correct
+    elif feedback_mode == 'none':
+        game_state['ui']['advice'] = {'text': '', 'type': 'neutral'} # Always clear advice
+
+    # _update_derived_ui_state() is called after this function in the main action routes.
 
 
-            /* Balance & Stats */
-            .text-2xl.font-bold.mb-6 {
-                margin-bottom: 0.75rem; /* Reduced from 1.5rem (mb-6) */
-                font-size: 1.25rem; /* Smaller balance font */
-            }
-            .grid.grid-cols-2.md\:grid-cols-4.gap-4.text-lg.font-semibold.mb-6.text-center {
-                margin-bottom: 0.75rem; /* Reduced from 1.5rem (mb-6) */
-                gap: 0.4rem; /* Reduced gap */
-            }
-            .grid.grid-cols-2.md\:grid-cols-4 p,
-            .grid.grid-cols-2.md\:grid-cols-4 span {
-                font-size: 0.85rem; /* Smaller text for stats */
-            }
-            .text-sm.font-semibold.leading-tight {
-                font-size: 0.75rem; /* Even smaller for running/decks remaining labels */
-            }
-            .font-bold.text-base {
-                font-size: 0.9rem; /* Smaller for running/decks remaining values */
-            }
+def deal_initial_cards_backend():
+    """Deals initial cards for a new hand."""
+    player_hand = game_state['round']['playerHands'][0]
 
+    player_card1 = deal_card()
+    player_card2 = deal_card()
+    # Mark initial cards as highlighted
+    player_card1['isHighlighted'] = True
+    player_card2['isHighlighted'] = True
+    player_hand['cards'].extend([player_card1, player_card2])
 
-            /* Hands Sections */
-            .mb-8.text-center {
-                margin-bottom: 0.75rem; /* Reduced from 2rem (mb-8) */
-            }
-            h2 {
-                margin-bottom: 0.4rem; /* Reduced from 0.5rem (mb-2) */
-                font-size: 1.1rem; /* Smaller section titles */
-            }
-            .card-container {
-                min-height: 90px; /* Adjust min-height for smaller cards */
-                gap: 0.3rem; /* Reduced gap between cards */
-            }
-            .card {
-                width: 50px; /* Smaller cards on mobile */
-                height: 75px;
-                padding: 0.25rem;
-            }
-            .card-value {
-                font-size: 1rem; /* Smaller card value font */
-            }
-            .card-suit-top, .card-suit-bottom {
-                font-size: 0.5rem; /* Smaller suit font */
-            }
-            .player-hand-wrapper span.text-lg.font-semibold.mb-2 {
-                font-size: 0.9rem; /* Smaller score text */
-                margin-bottom: 0.25rem;
-            }
-            .player-hand-wrapper div.text-lg.font-bold.mt-2 {
-                font-size: 0.9rem; /* Smaller winnings text */
-                margin-top: 0.25rem;
-            }
+    dealer_up_card = deal_card()
+    dealer_down_card = deal_card()
+    # Mark dealer's up card as highlighted
+    dealer_up_card['isHighlighted'] = True
+    game_state['round']['dealerHand'] = [dealer_up_card, dealer_down_card]
 
-            /* Game Message */
-            #game-message {
-                margin-bottom: 0.5rem; /* Reduced from 1rem (mb-4) */
-                font-size: 0.95rem; /* Smaller font on mobile */
-            }
+    player_hand['score'] = calculate_score(player_hand['cards'])
+    dealer_score = calculate_score(game_state['round']['dealerHand'])
+    game_state['round']['dealerScore'] = dealer_score # Store full dealer score
+    # initialHandForStrategy is no longer needed for highlighting, but kept for strategy evaluation
+    player_hand['initialHandForStrategy'] = [
+        {'value': c['value'], 'suit': c['suit']} for c in player_hand['cards']
+    ]
 
-            /* Buttons */
-            .flex.flex-wrap.justify-center.gap-4.mt-6 {
-                margin-top: 0.75rem; /* Reduced from 1.5rem (mt-6) */
-                gap: 0.4rem; /* Reduced gap between buttons */
-            }
-            button {
-                padding: 0.4rem 0.8rem; /* Smaller button padding */
-                font-size: 0.8rem; /* Smaller button font */
-            }
-        }
-    </style>
-</head>
-<body class="bg-gray-900 text-gray-100 flex flex-col items-center justify-center min-h-screen p-4">
-    <div class="bg-gray-800 p-6 rounded-xl shadow-2xl max-w-4xl w-full">
-        <h1 class="text-4xl font-bold text-center mb-6 text-yellow-400">Blackjack Strategy Trainer</h1>
+    player_has_blackjack = player_hand['score'] == 21 and len(player_hand['cards']) == 2
+    dealer_has_blackjack = dealer_score == 21 and len(game_state['round']['dealerHand']) == 2
 
-        <!-- Game Rules Display -->
-        <div id="game-rules-container" class="text-center text-sm mb-8 p-3 rounded-lg bg-gray-700 border border-gray-600 cursor-pointer user-select-none collapsed">
-            <div id="game-rules-header" class="flex justify-center items-center gap-2 text-lg font-semibold mb-1 text-blue-300">
-                <h3 class="text-lg font-semibold text-blue-300">Game Rules</h3>
-                <span id="game-rules-toggle-icon" class="text-blue-300">▼</span>
-            </div>
-            <div id="game-rules-content">
-                <p><span class="font-bold text-yellow-300">3:2</span> Blackjack Payout</p>
-                <p><span class="font-bold text-yellow-300">H17</span>: Dealer Hits on Soft 17.</p>
-                <p><span class="font-bold text-yellow-300">DAS</span>: Double After Split is Allowed.</p>
-                <p><span class="font-bold text-yellow-300">DAA</span>: Double After Any Two Cards is Allowed.</p>
-                <p><span class="font-bold text-yellow-300">SPL3</span>: Re-splitting up to 3 times is Allowed (max 4 hands).</p>
-                <p class="mt-4">Strategy based on the <a href="https://www.blackjackapprenticeship.com/wp-content/uploads/2024/09/H17-Basic-Strategy.pdf" target="_blank" class="text-blue-400 hover:text-blue-300 underline font-bold">H17 Basic Strategy Table</a>.</p>
-            </div>
-        </div>
+    if player_has_blackjack:
+        player_hand['isBlackjack'] = True
+        player_hand['isActive'] = False
+    if dealer_has_blackjack:
+        game_state['round']['dealerHadBlackjack'] = True
+        for hand in game_state['round']['playerHands']:
+            hand['isActive'] = False
 
-        <!-- Controls & Shoe Display -->
-        <div class="flex flex-col md:flex-row justify-center md:justify-around items-center gap-4 mb-6">
-            <div class="flex items-center gap-2">
-                <label for="shoe-size" class="text-lg font-semibold">Shoe Size:</label>
-                <select id="shoe-size" class="p-2 rounded-md bg-gray-700 text-white border border-gray-600 focus:outline-none focus:ring-2 focus:ring-blue-500">
-                    <option value="2">2 Decks</option>
-                    <option value="6" selected>6 Decks</option>
-                    <option value="8">8 Decks</option>
-                </select>
-            </div>
-            <div class="flex items-center gap-2">
-                <label for="bet-amount" class="text-lg font-semibold">Bet:</label>
-                <input type="number" id="bet-amount" value="10" min="1" class="w-24 p-2 rounded-md bg-gray-700 text-white border border-gray-600 focus:outline-none focus:ring-2 focus:ring-blue-500">
-            </div>
-            <div class="flex flex-col items-center">
-                <p class="text-sm font-semibold mb-1">Cards Remaining in Shoe:</p>
-                <div id="shoe-display-container" class="relative">
-                    <div id="shoe-visual"></div>
-                    <div id="cut-card-visual"></div>
-                </div>
-                <p id="shuffled-message" class="text-center text-green-400 text-sm font-semibold mt-1 hidden"></p>
-            </div>
-        </div>
-
-        <!-- Balance & Stats -->
-        <div class="text-center text-2xl font-bold mb-6">
-            Total Balance: <span id="total-balance" class="balance-neutral">$0.00</span>
-        </div>
-        <div class="grid grid-cols-2 md:grid-cols-4 gap-4 text-lg font-semibold mb-6 text-center">
-            <p id="hands-won-display">Hands Won: 0 / 0 (0%)</p>
-            <p id="strategy-correct-display">Strategy Correct: 0 / 0 (0%)</p>
-            <p class="text-lg font-semibold">True Count: <span id="true-count-display" class="font-bold">0.0</span></p>
-            <div class="flex flex-col items-center justify-center -space-y-1">
-                <p class="text-sm font-semibold leading-tight">Running Count: <span id="running-count-display" class="font-bold text-base">0</span></p>
-                <p class="text-sm font-semibold leading-tight">Decks Remaining: <span id="decks-remaining-display" class="font-bold text-base">0.0</span></p>
-            </div>
-        </div>
-
-        <!-- Hands -->
-        <div class="mb-8 text-center">
-            <h2 class="text-2xl font-semibold mb-2">Dealer's Hand: <span id="dealer-score">0</span></h2>
-            <div id="dealer-hand" class="card-container justify-center"></div>
-        </div>
-        <div class="mb-8 text-center">
-            <h2 class="text-2xl font-semibold mb-2">Your Hand(s):</h2>
-            <div id="player-hands-container" class="flex flex-wrap justify-center gap-4"></div>
-        </div>
-
-        <!-- Game Message (still inline, but less likely to cause jumps) -->
-        <div id="game-message" class="text-center text-xl font-bold mb-4"></div>
+    if player_has_blackjack or dealer_has_blackjack:
+        game_state['round']['isOver'] = True
+        # For blackjack scenarios, always show feedback regardless of mode, as it's a game outcome
+        # and not a strategy decision in the same way.
+        if player_has_blackjack and dealer_has_blackjack:
+            player_hand['outcome'] = 'push'
+            game_state['ui']['advice'] = {'text': 'Basic Strategy: <span class="advice-text-correct">Correct!</span> You and the dealer both have Natural Blackjack. It\'s a push.', 'type': 'correct'}
+        elif player_has_blackjack:
+            player_hand['outcome'] = 'win'
+            game_state['ui']['advice'] = {'text': 'Basic Strategy: <span class="advice-text-correct">Correct!</span> Natural Blackjack.', 'type': 'correct'}
+        else:
+            player_hand['outcome'] = 'lose'
+            game_state['ui']['advice'] = {'text': 'Basic Strategy: <span class="advice-text-correct">Dealer Blackjack.</span> Optimal play is no action.', 'type': 'correct'}
         
-        <!-- Advice Message (now handled by modal, this div is no longer used for displaying advice) -->
-        <!-- Keeping it in HTML for consistency with DOMstrings, but it's hidden and unused for advice text -->
-        <div id="advice-message" class="p-4 mt-4 rounded-lg text-center font-bold text-lg text-gray-100 hidden"></div>
+        # Increment strategy opportunities/correct for blackjack scenarios as they are "correct" non-actions
+        game_state['player']['stats']['strategyOpportunities'] += 1
+        game_state['player']['stats']['strategyCorrect'] += 1
 
-        <div class="flex flex-wrap justify-center gap-4 mt-6">
-            <button id="deal-button" class="px-4 py-2 rounded-lg font-semibold transition-all duration-200 ease-in-out bg-green-500 hover:bg-green-600 shadow-md border-2 border-green-700 text-white disabled:bg-gray-500 disabled:cursor-not-allowed disabled:border-gray-600 disabled:text-gray-400">Deal New Hand</button>
-            <button id="hit-button" class="px-4 py-2 rounded-lg font-semibold transition-all duration-200 ease-in-out bg-green-500 hover:bg-green-600 shadow-md border-2 border-green-700 text-white disabled:bg-gray-500 disabled:cursor-not-allowed disabled:border-gray-600 disabled:text-gray-400" disabled>Hit</button>
-            <button id="stand-button" class="px-4 py-2 rounded-lg font-semibold transition-all duration-200 ease-in-out bg-green-500 hover:bg-green-600 shadow-md border-2 border-green-700 text-white disabled:bg-gray-500 disabled:cursor-not-allowed disabled:border-gray-600 disabled:text-gray-400" disabled>Stand</button>
-            <button id="double-button" class="px-4 py-2 rounded-lg font-semibold transition-all duration-200 ease-in-out bg-green-500 hover:bg-green-600 shadow-md border-2 border-green-700 text-white disabled:bg-gray-500 disabled:cursor-not-allowed disabled:border-gray-600 disabled:text-gray-400" disabled>Double Down</button>
-            <button id="split-button" class="px-4 py-2 rounded-lg font-semibold transition-all duration-200 ease-in-out bg-green-500 hover:bg-green-600 shadow-md border-2 border-green-700 text-white disabled:bg-gray-500 disabled:cursor-not-allowed disabled:border-gray-600 disabled:text-gray-400" disabled>Split</button>
-        </div>
-    </div>
+        end_round_backend()
+    else:
+        if player_hand['score'] == 21:
+            game_state['ui']['message'] = f"Hand {game_state['round']['currentHandIndex'] + 1}: You have 21! Automatically standing."
+            player_hand['isActive'] = False
+            next_player_hand_backend()
+        else:
+            game_state['ui']['message'] = "Your turn. What's your move?"
+    _update_derived_ui_state()
 
-    <!-- NEW: Modal for Advice Messages -->
-    <div id="advice-modal-overlay" class="modal-overlay">
-        <div id="advice-modal-content" class="modal-content">
-            <button id="modal-close-button" class="modal-close-button">&times;</button>
-            <div id="modal-advice-text" class="text-gray-100 font-bold text-lg mb-2"></div>
-        </div>
-    </div>
+def next_player_hand_backend():
+    """Moves to the next player hand or triggers dealer's turn."""
+    found_next_hand = False
+    # Check from current hand index to end
+    for i in range(game_state['round']['currentHandIndex'], len(game_state['round']['playerHands'])):
+        if game_state['round']['playerHands'][i]['isActive']:
+            game_state['round']['currentHandIndex'] = i
+            found_next_hand = True
+            break
+    # If no active hand found from current index, check from beginning
+    if not found_next_hand:
+        for i in range(len(game_state['round']['playerHands'])):
+            if game_state['round']['playerHands'][i]['isActive']:
+                game_state['round']['currentHandIndex'] = i
+                found_next_hand = True
+                break
 
-    <script>
-    // --- MODULE PATTERN: UI CONTROLLER ---
-    const uiController = (function() {
+    if found_next_hand:
+        game_state['ui']['message'] = f"Playing Hand {game_state['round']['currentHandIndex'] + 1}. What's your move?"
+    else:
+        game_state['round']['isOver'] = True
+        dealer_turn_backend()
+    _update_derived_ui_state()
+
+def dealer_turn_backend():
+    """Handles the dealer's turn."""
+    dealer_score = calculate_score(game_state['round']['dealerHand'])
+    game_state['round']['dealerScore'] = dealer_score # Update dealer score after initial calculation
+
+    is_soft17 = dealer_score == 17 and any(c['value'] == 'A' for c in game_state['round']['dealerHand'])
+
+    while dealer_score < 17 or (GAME_CONFIG['dealerHitsOnSoft17'] and is_soft17):
+        new_card = deal_card()
+        game_state['round']['dealerHand'].append(new_card)
+        dealer_score = calculate_score(game_state['round']['dealerHand'])
+        is_soft17 = dealer_score == 17 and any(c['value'] == 'A' for c in game_state['round']['dealerHand'])
+    game_state['round']['dealerScore'] = dealer_score # Final dealer score
+    end_round_backend()
+    _update_derived_ui_state()
+
+def end_round_backend():
+    """Ends the current round."""
+    game_state['round']['isOver'] = True
+    determine_game_results()
+
+    overall_msg = ""
+    for i, hand in enumerate(game_state['round']['playerHands']):
+        if hand['outcome'] == 'win':
+            overall_msg += f"Hand {i + 1}: Win! "
+        elif hand['outcome'] == 'lose':
+            overall_msg += f"Hand {i + 1}: Lose. "
+        else:
+            overall_msg += f"Hand {i + 1}: Push. "
+    game_state['ui']['message'] = overall_msg
+    _update_derived_ui_state()
+
+def _render_card_html(card, is_hidden=False):
+    """Generates HTML for a single card."""
+    card_classes = f"card {'red' if card['suit'] in ['♥', '♦'] else ''} {'highlight-card' if card.get('isHighlighted') else ''}"
+    
+    if is_hidden:
+        card_classes += " card-back"
+        return f'<div class="{card_classes}"></div>'
+    else:
+        val = card['value']
+        if val in ['2', '3', '4', '5', '6']:
+            card_classes += " card-count-positive"
+        elif val in ['10', 'J', 'Q', 'K', 'A']:
+            card_classes += " card-count-negative"
         
-        const DOMstrings = {
-            dealButton: '#deal-button',
-            hitButton: '#hit-button',
-            standButton: '#stand-button',
-            doubleButton: '#double-button',
-            splitButton: '#split-button',
-            playerHandsContainer: '#player-hands-container',
-            dealerHandDiv: '#dealer-hand',
-            dealerScoreSpan: '#dealer-score',
-            gameMessageDiv: '#game-message',
-            // adviceMessageDiv is now only for DOMstrings, actual advice rendered in modal
-            adviceMessageDiv: '#advice-message', 
-            handsWonDisplay: '#hands-won-display',
-            strategyCorrectDisplay: '#strategy-correct-display',
-            runningCountDisplay: '#running-count-display',
-            decksRemainingDisplay: '#decks-remaining-display',
-            trueCountDisplay: '#true-count-display',
-            shoeSizeSelect: '#shoe-size',
-            betAmountInput: '#bet-amount',
-            totalBalanceDisplay: '#total-balance',
-            shoeVisualDiv: '#shoe-visual',
-            cutCardVisualDiv: '#cut-card-visual',
-            shuffledMessageDiv: '#shuffled-message',
-            gameRulesContainer: '#game-rules-container',
-            gameRulesHeader: '#game-rules-header',
-            // New Modal DOM elements
-            adviceModalOverlay: '#advice-modal-overlay',
-            modalAdviceText: '#modal-advice-text',
-            modalCloseButton: '#modal-close-button'
-        };
+        return f'''
+        <div class="{card_classes}">
+            <div class="card-suit-top self-start">{card['suit']}</div>
+            <div class="card-value">{card['value']}</div>
+            <div class="card-suit-bottom self-end">{card['suit']}</div>
+        </div>
+        '''
 
+def _render_player_hand_html(hand, index, current_hand_index, is_game_over):
+    """Generates HTML for a single player hand."""
+    hand_wrapper_classes = 'player-hand-wrapper flex flex-col items-center'
+    if index == current_hand_index and not is_game_over and hand['isActive']:
+        hand_wrapper_classes += ' active'
+    elif hand['score'] > 21:
+        hand_wrapper_classes += ' busted'
+    elif not hand['isActive']:
+        hand_wrapper_classes += ' stood'
+
+    cards_html = "".join([_render_card_html(card) for card in hand['cards']])
+    
+    winnings_html = ""
+    if hand['winnings'] is not None:
+        sign = '+' if hand['winnings'] > 0 else ('-' if hand['winnings'] < 0 else '')
+        color = 'text-green-400' if hand['winnings'] > 0 else ('text-red-400' if hand['winnings'] < 0 else 'text-gray-400')
+        winnings_text = f"{sign}${abs(hand['winnings']):.2f}"
+        winnings_html = f'''
+        <div class="text-lg font-bold mt-2 h-7">
+            <span class="{color}">{winnings_text}</span>
+        </div>
+        '''
+    else:
+        # Render an invisible placeholder to reserve space
+        winnings_html = '<div class="text-lg font-bold mt-2 h-7">&nbsp;</div>'
+
+
+    return f'''
+    <div id="player-hand-{index}" class="{hand_wrapper_classes}">
+        <span class="text-lg font-semibold mb-2">Score: {hand['score']}</span>
+        <div class="card-container justify-center">
+            {cards_html}
+        </div>
+        {winnings_html}
+    </div>
+    '''
+
+def _render_dealer_hand_html(dealer_hand, is_game_over):
+    """Generates HTML for the dealer's hand."""
+    cards_html = ""
+    for index, card in enumerate(dealer_hand):
+        is_hidden = not is_game_over and index == 1
+        cards_html += _render_card_html(card, is_hidden)
+    
+    return f'''
+    <div id="dealer-hand" class="card-container justify-center">
+        {cards_html}
+    </div>
+    '''
+
+def _update_derived_ui_state():
+    """
+    Calculates and updates all derived UI-related state variables, including HTML.
+    This function should be called after any game state change.
+    """
+    # 1. Update Dealer Display Score
+    if game_state['round']['isOver']:
+        game_state['ui']['dealerDisplayScore'] = game_state['round']['dealerScore']
+    else:
+        if game_state['round']['dealerHand'] and len(game_state['round']['dealerHand']) > 0:
+            dealer_up_card = game_state['round']['dealerHand'][0]
+            game_state['ui']['dealerDisplayScore'] = calculate_score([dealer_up_card])
+        else:
+            game_state['ui']['dealerDisplayScore'] = 0
+
+    # 2. Update Statistics Percentages
+    hands_played = game_state['player']['stats']['handsPlayed']
+    hands_won = game_state['player']['stats']['handsWon']
+    strategy_opportunities = game_state['player']['stats']['strategyOpportunities']
+    strategy_correct = game_state['player']['stats']['strategyCorrect']
+
+    game_state['player']['stats']['handsWonPct'] = (hands_won / hands_played * 100) if hands_played > 0 else 0.0
+    game_state['player']['stats']['strategyCorrectPct'] = (strategy_correct / strategy_opportunities * 100) if strategy_opportunities > 0 else 0.0
+
+    # 3. Update Card Counting Displays
+    shoe = game_state['shoe']
+    counts = game_state['counts']
+    decks_remaining = (shoe['totalCards'] - shoe['cardsDealt']) / 52.0
+    counts['decksRemaining'] = max(0.0, decks_remaining) # Ensure it doesn't go negative
+    counts['true'] = counts['running'] / counts['decksRemaining'] if counts['decksRemaining'] > 0.1 else 0.0
+
+    # 4. Update Button States
+    game_state['ui']['buttons'] = {
+        'deal': False, 'hit': False, 'stand': False, 'double': False, 'split': False
+    }
+
+    if game_state['round']['isOver']:
+        game_state['ui']['buttons']['deal'] = True
+    else:
+        current_hand = game_state['round']['playerHands'][game_state['round']['currentHandIndex']]
+        if current_hand and current_hand['isActive']:
+            game_state['ui']['buttons']['hit'] = True
+            game_state['ui']['buttons']['stand'] = True
+
+            # Double Down logic
+            if len(current_hand['cards']) == 2 and not current_hand['isSplitAce']:
+                game_state['ui']['buttons']['double'] = True
+
+            # Split logic
+            if len(current_hand['cards']) == 2 and \
+               current_hand['cards'][0]['value'] == current_hand['cards'][1]['value'] and \
+               len(game_state['round']['playerHands']) < GAME_CONFIG['maxHandsAfterSplitting']:
+                game_state['ui']['buttons']['split'] = True
+
+            # Special case for split aces: after one card, they stand automatically
+            if current_hand['isSplitAce'] and len(current_hand['cards']) == 2 and not current_hand['isActive']:
+                game_state['ui']['buttons']['hit'] = False
+                game_state['ui']['buttons']['stand'] = False
+                game_state['ui']['buttons']['double'] = False
+                game_state['ui']['buttons']['split'] = False # Can't split again after 1 card
+
+    # 5. Generate HTML for hands
+    player_hands_html_list = []
+    for index, hand in enumerate(game_state['round']['playerHands']):
+        player_hands_html_list.append(_render_player_hand_html(hand, index, game_state['round']['currentHandIndex'], game_state['round']['isOver']))
+    game_state['ui']['playerHandsHtml'] = "".join(player_hands_html_list)
+    game_state['ui']['dealerHandHtml'] = _render_dealer_hand_html(game_state['round']['dealerHand'], game_state['round']['isOver'])
+
+
+# --- API ENDPOINTS ---
+
+@app.route('/game_state', methods=['GET'])
+def get_current_game_state():
+    """Returns the current game state."""
+    return jsonify(game_state)
+
+@app.route('/init_game', methods=['POST'])
+def init_game():
+    """Initializes the game state."""
+    data = request.json
+    shoe_size = int(data.get('shoeSize', 6))
+    set_initial_state(shoe_size)
+    reshuffle_shoe()
+    game_state['ui']['message'] = "Place your bet and click 'Deal New Hand' to start."
+    _update_derived_ui_state()
+    return jsonify(game_state)
+
+@app.route('/deal', methods=['POST'])
+def deal_new_hand():
+    """Handles dealing a new hand."""
+    data = request.json
+    bet_amount = int(data.get('betAmount', 10))
+
+    if bet_amount <= 0:
+        game_state['ui']['message'] = "Please enter a valid bet amount."
+        _update_derived_ui_state()
+        return jsonify(game_state), 400
+
+    if game_state['shoe']['cardsDealt'] >= game_state['shoe']['cutCardPosition']:
+        reshuffle_shoe()
+        game_state['shoe']['showShuffledMessage'] = True
+    else:
+        game_state['shoe']['showShuffledMessage'] = False
+
+    # IMPORTANT: Do NOT clear game_state['ui']['advice'] here.
+    # It's cleared by evaluate_player_action based on feedback mode, or by start_new_hand.
+    start_new_hand(bet_amount)
+    print(f"[DEBUG] deal_new_hand: Feedback Mode before dealing initial cards: {game_state['ui']['feedbackMode']}")
+    deal_initial_cards_backend()
+    _update_derived_ui_state()
+    return jsonify(game_state)
+
+@app.route('/hit', methods=['POST'])
+def hit_action():
+    """Handles a player 'hit' action."""
+    print(f"[DEBUG] hit_action: Feedback Mode at start: {game_state['ui']['feedbackMode']}")
+    current_hand = game_state['round']['playerHands'][game_state['round']['currentHandIndex']]
+    if not current_hand or not current_hand['isActive'] or game_state['round']['isOver']:
+        return jsonify(game_state), 400 # Bad request
+
+    evaluate_player_action(current_hand, game_state['round']['dealerHand'][0], 'Hit')
+    new_card = deal_card()
+    current_hand['cards'].append(new_card)
+    current_hand['score'] = calculate_score(current_hand['cards'])
+
+    if current_hand['score'] >= 21:
+        current_hand['isActive'] = False
+        if current_hand['score'] > 21:
+            current_hand['outcome'] = 'lose'
+        next_player_hand_backend()
+    _update_derived_ui_state()
+    return jsonify(game_state)
+
+@app.route('/stand', methods=['POST'])
+def stand_action():
+    """Handles a player 'stand' action."""
+    print(f"[DEBUG] stand_action: Feedback Mode at start: {game_state['ui']['feedbackMode']}")
+    current_hand = game_state['round']['playerHands'][game_state['round']['currentHandIndex']]
+    if not current_hand or not current_hand['isActive'] or game_state['round']['isOver']:
+        return jsonify(game_state), 400
+
+    evaluate_player_action(current_hand, game_state['round']['dealerHand'][0], 'Stand')
+    current_hand['isActive'] = False
+    next_player_hand_backend()
+    _update_derived_ui_state()
+    return jsonify(game_state)
+
+@app.route('/double', methods=['POST'])
+def double_action():
+    """Handles a player 'double down' action."""
+    print(f"[DEBUG] double_action: Feedback Mode at start: {game_state['ui']['feedbackMode']}")
+    current_hand = game_state['round']['playerHands'][game_state['round']['currentHandIndex']]
+    if not current_hand or not current_hand['isActive'] or game_state['round']['isOver'] or len(current_hand['cards']) != 2:
+        return jsonify(game_state), 400
+
+    new_card = deal_card()
+    evaluate_player_action(current_hand, game_state['round']['dealerHand'][0], 'Double')
+    current_hand['hasDoubledDown'] = True
+    current_hand['bet'] *= 2
+    current_hand['cards'].append(new_card)
+    current_hand['score'] = calculate_score(current_hand['cards'])
+    current_hand['isActive'] = False
+    if current_hand['score'] > 21:
+        current_hand['outcome'] = 'lose'
+    next_player_hand_backend()
+    _update_derived_ui_state()
+    return jsonify(game_state)
+
+@app.route('/split', methods=['POST'])
+def split_action():
+    """Handles a player 'split' action."""
+    print(f"[DEBUG] split_action: Feedback Mode at start: {game_state['ui']['feedbackMode']}")
+    current_hand = game_state['round']['playerHands'][game_state['round']['currentHandIndex']]
+    if not current_hand or not current_hand['isActive'] or game_state['round']['isOver'] or \
+       len(current_hand['cards']) != 2 or current_hand['cards'][0]['value'] != current_hand['cards'][1]['value'] or \
+       len(game_state['round']['playerHands']) >= GAME_CONFIG['maxHandsAfterSplitting']:
+        return jsonify(game_state), 400
+
+    evaluate_player_action(current_hand, game_state['round']['dealerHand'][0], 'Split')
+
+    card1, card2 = current_hand['cards']
+    is_splitting_aces = (card1['value'] == 'A')
+
+    def create_new_hand(card):
+        # When splitting, the new cards dealt to these hands are not 'initial' cards
         return {
-            getDOMstrings: function() {
-                return DOMstrings;
-            },
-
-            // Renders player hands using HTML received from backend
-            renderAllPlayerHands: function(gameState) {
-                document.querySelector(DOMstrings.playerHandsContainer).innerHTML = gameState.ui.playerHandsHtml;
-            },
-
-            // Renders dealer hand using HTML received from backend
-            renderDealerHand: function(gameState) {
-                document.querySelector(DOMstrings.dealerHandDiv).innerHTML = gameState.ui.dealerHandHtml;
-            },
-
-            // Simplified: now uses pre-calculated dealerDisplayScore from backend
-            updateScores: function(gameState) {
-                document.querySelector(DOMstrings.dealerScoreSpan).textContent = gameState.ui.dealerDisplayScore;
-            },
-
-            // Simplified: now uses pre-calculated button states from backend
-            updateActionButtons: function(gameState) {
-                const buttons = gameState.ui.buttons;
-                document.querySelector(DOMstrings.dealButton).disabled = !buttons.deal;
-                document.querySelector(DOMstrings.hitButton).disabled = !buttons.hit;
-                document.querySelector(DOMstrings.standButton).disabled = !buttons.stand;
-                document.querySelector(DOMstrings.doubleButton).disabled = !buttons.double;
-                document.querySelector(DOMstrings.splitButton).disabled = !buttons.split;
-
-                // Bet amount input is enabled only when deal button is enabled
-                document.querySelector(DOMstrings.betAmountInput).disabled = !buttons.deal;
-            },
-
-            // Simplified: now uses pre-calculated percentages from backend
-            updateStatisticsDisplay: function(stats) {
-                document.querySelector(DOMstrings.handsWonDisplay).textContent = `Hands Won: ${stats.handsWon} / ${stats.handsPlayed} (${stats.handsWonPct.toFixed(1)}%)`;
-                document.querySelector(DOMstrings.strategyCorrectDisplay).textContent = `Strategy Correct: ${stats.strategyCorrect} / ${stats.strategyOpportunities} (${stats.strategyCorrectPct.toFixed(1)}%)`;
-            },
-
-            // Simplified: now uses pre-calculated counts from backend
-            updateCardCountingDisplays: function(counts, shoe) {
-                document.querySelector(DOMstrings.runningCountDisplay).textContent = counts.running;
-                document.querySelector(DOMstrings.decksRemainingDisplay).textContent = counts.decksRemaining.toFixed(1);
-                document.querySelector(DOMstrings.trueCountDisplay).textContent = counts.true.toFixed(1);
-            },
-
-            updateBalanceDisplay: function(balance) {
-                const el = document.querySelector(DOMstrings.totalBalanceDisplay);
-                el.textContent = `$${balance.toFixed(2)}`;
-                el.className = 'font-bold';
-                if (balance > 0) el.classList.add('balance-positive');
-                else if (balance < 0) el.classList.add('balance-negative');
-                else el.classList.add('balance-neutral');
-            },
-
-            updateShoeVisual: function(shoe) {
-                const CARD_WIDTH_UNIT_PX = 250 / shoe.totalCards;
-                document.querySelector(DOMstrings.shoeVisualDiv).style.width = (shoe.totalCards - shoe.cardsDealt) * CARD_WIDTH_UNIT_PX + 'px';
-                let cutCardLeft = (shoe.cutCardPosition - shoe.cardsDealt) * CARD_WIDTH_UNIT_PX;
-                const cutCardEl = document.querySelector(DOMstrings.cutCardVisualDiv);
-                cutCardEl.style.display = cutCardLeft < 0 ? 'none' : 'block';
-                cutCardEl.style.left = cutCardLeft + 'px';
-            },
-
-            renderInitialShoe: function(shoe) {
-                const CARD_WIDTH_UNIT_PX = 250 / shoe.totalCards;
-                document.querySelector(DOMstrings.shoeVisualDiv).style.width = (250) + 'px';
-                document.querySelector(DOMstrings.cutCardVisualDiv).style.left = (shoe.cutCardPosition * CARD_WIDTH_UNIT_PX) + 'px';
-                document.querySelector(DOMstrings.cutCardVisualDiv).style.display = 'block';
-            },
-
-            updateShuffledMessageDisplay: function(show) {
-                const el = document.querySelector(DOMstrings.shuffledMessageDiv);
-                if (show) {
-                    el.textContent = "Shoe shuffled!";
-                    el.classList.remove('hidden');
-                } else {
-                    el.classList.add('hidden');
-                }
-            },
-
-            displayGameMessage: function(message, type = '') {
-                const el = document.querySelector(DOMstrings.gameMessageDiv);
-                el.textContent = message;
-                el.className = 'text-center text-xl font-bold mb-4';
-                if (type === 'win') el.classList.add('text-green-500');
-                else if (type === 'lose') el.classList.add('text-red-500');
-                else if (type === 'push') el.classList.add('text-blue-500');
-            },
-
-            // NEW: Display advice in a modal
-            displayAdvice: function(advice) {
-                const modalOverlay = document.querySelector(DOMstrings.adviceModalOverlay);
-                const modalAdviceText = document.querySelector(DOMstrings.modalAdviceText);
-                const modalContent = document.querySelector('#advice-modal-content'); // Get content for background color
-
-                modalAdviceText.innerHTML = advice.text;
-                
-                // Set modal content background based on advice type
-                modalContent.classList.remove('bg-green-700', 'bg-red-700', 'bg-blue-700');
-                const typeClasses = {
-                    correct: 'bg-green-700',
-                    incorrect: 'bg-red-700',
-                    neutral: 'bg-blue-700'
-                };
-                modalContent.classList.add(typeClasses[advice.type]);
-
-                modalOverlay.classList.add('show'); // Show the modal
-            },
-
-            // NEW: Clear/hide the advice modal
-            clearAdvice: function() {
-                const modalOverlay = document.querySelector(DOMstrings.adviceModalOverlay);
-                modalOverlay.classList.remove('show'); // Hide the modal
-            }
-        };
-    })();
-
-
-    // --- MODULE PATTERN: APP CONTROLLER ---
-    const appController = (function(uiCtrl) {
-
-        const DOM = uiCtrl.getDOMstrings();
-        // === IMPORTANT CHANGE HERE ===
-        // Replace this with your actual Ngrok URL (e.g., https://6eaaaa34f751.ngrok-free.app)
-        const BASE_URL = 'https://6ee6d7164154.ngrok-free.app'; 
-
-        let currentGameState = {}; // Store the current game state fetched from backend
-
-        async function fetchGameState() {
-            try {
-                const response = await fetch(`${BASE_URL}/game_state`);
-                if (!response.ok) {
-                    throw new Error(`HTTP error! status: ${response.status}`);
-                }
-                const data = await response.json();
-                currentGameState = data; // Update local game state
-                updateFullUI();
-            }
-            // Error handling for fetchGameState
-            catch (error) {
-                console.error('Error fetching game state:', error);
-                uiCtrl.displayGameMessage('Error connecting to game server. Please ensure the backend is running and Ngrok is active.', 'error');
-            }
+            'cards': [card], 'score': 0, 'bet': game_state['round']['betAmount'], 'isActive': True,
+            'hasDoubledDown': False, 'isBlackjack': False, 'isSplitAce': is_splitting_aces,
+            'initialHandForStrategy': [], 'outcome': None, 'winnings': None
         }
 
-        async function postAction(endpoint, payload = {}) {
-            try {
-                uiCtrl.clearAdvice(); // Clear advice modal before new action
-                const response = await fetch(`${BASE_URL}/${endpoint}`, {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json',
-                    },
-                    body: JSON.stringify(payload)
-                });
-                if (!response.ok) {
-                    const errorData = await response.json();
-                    throw new Error(`HTTP error! status: ${response.status}, message: ${errorData.message || 'Unknown error'}`);
-                }
-                const data = await response.json();
-                currentGameState = data; // Update local game state
-                updateFullUI();
-            }
-            // Error handling for postAction
-            catch (error) {
-                console.error(`Error performing action ${endpoint}:`, error);
-                uiCtrl.displayGameMessage(`Error: ${error.message}. Please ensure the backend is running and Ngrok is active.`, 'error');
-            }
-        }
+    new_hand1 = create_new_hand(card1)
+    new_hand2 = create_new_hand(card2)
 
-        function setupEventListeners() {
-            document.querySelector(DOM.dealButton).addEventListener('click', () => postAction('deal', { betAmount: parseInt(document.querySelector(DOM.betAmountInput).value) }));
-            document.querySelector(DOM.hitButton).addEventListener('click', () => postAction('hit'));
-            document.querySelector(DOM.standButton).addEventListener('click', () => postAction('stand'));
-            document.querySelector(DOM.doubleButton).addEventListener('click', () => postAction('double'));
-            document.querySelector(DOM.splitButton).addEventListener('click', () => postAction('split'));
-            
-            // Event listener for shoe size change
-            document.querySelector(DOM.shoeSizeSelect).addEventListener('change', async (event) => {
-                const newShoeSize = parseInt(event.target.value);
-                await postAction('set_shoe_size', { shoeSize: newShoeSize });
-            });
-            // Event listener for bet amount change
-            document.querySelector(DOM.betAmountInput).addEventListener('change', async (event) => {
-                const newBetAmount = parseInt(event.target.value);
-                await postAction('set_bet_amount', { betAmount: newBetAmount });
-            });
+    # Replace the current hand with the two new hands
+    game_state['round']['playerHands'].pop(game_state['round']['currentHandIndex'])
+    game_state['round']['playerHands'].insert(game_state['round']['currentHandIndex'], new_hand1)
+    game_state['round']['playerHands'].insert(game_state['round']['currentHandIndex'] + 1, new_hand2)
 
-            document.querySelector(DOM.gameRulesHeader).addEventListener('click', () => {
-                document.querySelector(DOM.gameRulesContainer).classList.toggle('collapsed');
-            });
 
-            // NEW: Event listener for modal close button
-            document.querySelector(DOM.modalCloseButton).addEventListener('click', uiCtrl.clearAdvice);
-            // Also close modal if clicking outside the content
-            document.querySelector(DOM.adviceModalOverlay).addEventListener('click', (event) => {
-                if (event.target === document.querySelector(DOM.adviceModalOverlay)) {
-                    uiCtrl.clearAdvice();
-                }
-            });
-        }
+    for hand in [new_hand1, new_hand2]:
+        new_card = deal_card()
+        hand['cards'].append(new_card)
+        hand['score'] = calculate_score(hand['cards'])
+        # The initial cards for strategy are the two cards in the split hand
+        hand['initialHandForStrategy'] = [
+            {'value': hand['cards'][0]['value'], 'suit': hand['cards'][0]['suit']},
+            {'value': hand['cards'][1]['value'], 'suit': hand['cards'][1]['suit']}
+        ]
+        if hand['isSplitAce']:
+            hand['isActive'] = False # After splitting aces, only one card is dealt per hand, then they stand.
+        elif hand['score'] == 21:
+            hand['isActive'] = False
 
-        function updateFullUI() {
-            // Ensure currentGameState is populated before rendering
-            if (!currentGameState || Object.keys(currentGameState).length === 0) {
-                console.warn("Game state not yet loaded or is empty.");
-                return;
-            }
+    # After splitting, the first new hand becomes the active hand.
+    # If the first new hand is already inactive (e.g., split aces), move to the next.
+    if not new_hand1['isActive']:
+        next_player_hand_backend()
+    # Otherwise, the currentHandIndex already points to new_hand1, so no change needed.
+    _update_derived_ui_state()
+    return jsonify(game_state)
 
-            // Now, these functions directly use the HTML strings from the backend
-            uiCtrl.renderAllPlayerHands(currentGameState);
-            uiCtrl.renderDealerHand(currentGameState); 
-            
-            uiCtrl.updateScores(currentGameState); 
-            uiCtrl.updateStatisticsDisplay(currentGameState.player.stats); 
-            uiCtrl.updateCardCountingDisplays(currentGameState.counts, currentGameState.shoe); 
-            uiCtrl.updateBalanceDisplay(currentGameState.player.totalBalance);
-            uiCtrl.updateActionButtons(currentGameState); 
-            uiCtrl.updateShoeVisual(currentGameState.shoe);
-            
-            // Game message is still inline
-            uiCtrl.displayGameMessage(currentGameState.ui.message);
+@app.route('/reset_game', methods=['POST'])
+def reset_game():
+    """Resets the game state."""
+    data = request.json
+    shoe_size = int(data.get('shoeSize', 6))
+    set_initial_state(shoe_size) # This will now preserve feedbackMode
+    reshuffle_shoe()
+    game_state['ui']['message'] = "Place your bet and click 'Deal New Hand' to start."
+    _update_derived_ui_state()
+    return jsonify(game_state)
 
-            // Advice is now displayed in the modal
-            if (currentGameState.ui.advice && currentGameState.ui.advice.text) {
-                uiCtrl.displayAdvice(currentGameState.ui.advice);
-            } else {
-                // If no advice text, explicitly hide the modal
-                uiCtrl.clearAdvice();
-            }
-            uiCtrl.updateShuffledMessageDisplay(currentGameState.shoe.showShuffledMessage);
-        }
+@app.route('/set_shoe_size', methods=['POST'])
+def set_shoe_size_route():
+    """Sets the shoe size and resets the game."""
+    data = request.json
+    new_shoe_size = int(data.get('shoeSize', 6))
+    game_state['shoe']['size'] = new_shoe_size
+    set_initial_state(new_shoe_size) # Reset with new size, preserves feedbackMode
+    reshuffle_shoe()
+    game_state['ui']['message'] = "Shoe size updated. Place your bet and click 'Deal New Hand' to start."
+    game_state['ui']['advice'] = {'text': '', 'type': 'neutral'} # Clear advice
+    _update_derived_ui_state()
+    return jsonify(game_state)
 
-        return {
-            init: async function() {
-                console.log('Application has started.');
-                // Initialize the game state on the backend first
-                await postAction('init_game', { shoeSize: parseInt(document.querySelector(DOM.shoeSizeSelect).value) });
-                // Then fetch and render the initial state
-                await fetchGameState();
-                setupEventListeners();
-            }
-        };
+@app.route('/set_bet_amount', methods=['POST'])
+def set_bet_amount_route():
+    """Sets the bet amount."""
+    data = request.json
+    new_bet_amount = int(data.get('betAmount', 10))
+    game_state['round']['betAmount'] = new_bet_amount
+    game_state['ui']['advice'] = {'text': '', 'type': 'neutral'} # Clear advice
+    _update_derived_ui_state()
+    return jsonify(game_state)
 
-    })(uiController);
+# Endpoint to set feedback mode
+@app.route('/set_feedback_mode', methods=['POST'])
+def set_feedback_mode_route():
+    """Sets the feedback mode."""
+    data = request.json
+    new_mode = data.get('mode', 'all') # Default to 'all' if not provided
+    if new_mode in ['all', 'incorrect', 'none']:
+        game_state['ui']['feedbackMode'] = new_mode
+        game_state['ui']['message'] = f"Feedback mode set to: {new_mode.capitalize()}."
+    else:
+        game_state['ui']['message'] = "Invalid feedback mode."
+    game_state['ui']['advice'] = {'text': '', 'type': 'neutral'} # Clear advice
+    print(f"[DEBUG] set_feedback_mode_route: Feedback Mode set to {game_state['ui']['feedbackMode']}")
+    _update_derived_ui_state()
+    return jsonify(game_state)
 
-    // --- INITIALIZE APP ---
-    appController.init();
-
-    </script>
-</body>
-</html>
+if __name__ == '__main__':
+    # Initialize game state when the server starts
+    # This is the very first initialization, so feedbackMode defaults to 'all'
+    game_state = get_initial_state()
+    game_state['ui']['feedbackMode'] = 'all' # Explicitly set default here
+    reshuffle_shoe()
+    print(f"[DEBUG] Server startup: Initial Feedback Mode: {game_state['ui']['feedbackMode']}")
+    app.run(debug=True, host='0.0.0.0') # Run in debug mode for development, disable for production
