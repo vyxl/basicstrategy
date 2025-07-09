@@ -308,15 +308,8 @@
     // --- EVENT LISTENERS ---
     function setupEventListeners() {
         DOMElements.dealButton.addEventListener('click', () => {
-            let betAmount = parseInt(DOMElements.betAmountInput.value);
-            if (isNaN(betAmount) || betAmount < 1) {
-                betAmount = 10;
-                DOMElements.betAmountInput.value = '10';
-            }
-            postRequest('deal', { betAmount: betAmount });
+            postRequest('deal', { betAmount: parseInt(DOMElements.betAmountInput.value) });
         });
-
-        // ✅ UPDATED: Action buttons now disable immediately on click
         DOMElements.hitButton.addEventListener('click', () => {
             disableActionButtons();
             postRequest('hit');
@@ -348,9 +341,13 @@
             DOMElements.gameRulesContainer.classList.toggle('collapsed');
         });
 
+        // ✅ ADD THIS CODE BLOCK to filter the bet amount input
         DOMElements.betAmountInput.addEventListener('input', () => {
             const betInput = DOMElements.betAmountInput;
+            // Remove any character that is not a digit from 0-9
             const cleanValue = betInput.value.replace(/[^0-9]/g, '');
+
+            // Update the field's value only if it has changed
             if (betInput.value !== cleanValue) {
                 betInput.value = cleanValue;
             }
