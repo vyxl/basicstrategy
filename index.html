@@ -300,9 +300,18 @@
     
     // --- EVENT LISTENERS ---
     function setupEventListeners() {
+        // ✅ UPDATED: Deal button logic now handles empty bets
         DOMElements.dealButton.addEventListener('click', () => {
-            postRequest('deal', { betAmount: parseInt(DOMElements.betAmountInput.value) });
+            let betAmount = parseInt(DOMElements.betAmountInput.value);
+
+            // If the bet is invalid or empty, default to 10
+            if (isNaN(betAmount) || betAmount < 1) {
+                betAmount = 10;
+                DOMElements.betAmountInput.value = '10'; // Update field to show the default
+            }
+            postRequest('deal', { betAmount: betAmount });
         });
+
         DOMElements.hitButton.addEventListener('click', () => postRequest('hit'));
         DOMElements.standButton.addEventListener('click', () => postRequest('stand'));
         DOMElements.doubleButton.addEventListener('click', () => postRequest('double'));
@@ -322,19 +331,15 @@
             DOMElements.gameRulesContainer.classList.toggle('collapsed');
         });
 
+        // ✅ UPDATED: Input field now only allows digits
         DOMElements.betAmountInput.addEventListener('input', () => {
             const betInput = DOMElements.betAmountInput;
-            let value = betInput.value;
-
             // Remove any character that is not a digit
             const cleanValue = betInput.value.replace(/[^0-9]/g, '');
 
-            // Update the input field only if the value has changed
-            // and it's a valid number.
-            if (!isNaN(cleanValue) && betInput.value != cleanValue) {
+            if (betInput.value !== cleanValue) {
                 betInput.value = cleanValue;
-            } else if (isNaN(cleanValue)) {
-                betInput.value = 10; // Set bet to $10 if no valid value in bet amount field
+            }
         });
     }
 
