@@ -172,6 +172,7 @@
     <script>
     // --- STATE & CONFIG ---
     let gameState = {};
+    let lastBetAmount = 10;
     const API_BASE_URL = 'https://6ee6d7164154.ngrok-free.app'; // <-- REMEMBER TO CHANGE THIS URL
 
     // --- DOM ELEMENTS ---
@@ -307,9 +308,23 @@
     
     // --- EVENT LISTENERS ---
     function setupEventListeners() {
+        // ✅ UPDATED: Deal button logic now defaults to the last valid bet
         DOMElements.dealButton.addEventListener('click', () => {
-            postRequest('deal', { betAmount: parseInt(DOMElements.betAmountInput.value) });
+            const betInput = DOMElements.betAmountInput;
+            let betAmountToSend;
+
+            // Use the input's value if it's valid, and save it as the last bet.
+            if (betInput.value && parseInt(betInput.value) > 0) {
+                betAmountToSend = parseInt(betInput.value);
+                lastBetAmount = betAmountToSend;
+            } else {
+                // Otherwise, fall back to the last saved bet and update the input field.
+                betAmountToSend = lastBetAmount;
+                betInput.value = betAmountToSend;
+            }
+            postRequest('deal', { betAmount: betAmountToSend });
         });
+
         DOMElements.hitButton.addEventListener('click', () => {
             disableActionButtons();
             postRequest('hit');
@@ -341,13 +356,10 @@
             DOMElements.gameRulesContainer.classList.toggle('collapsed');
         });
 
-        // ✅ ADD THIS CODE BLOCK to filter the bet amount input
         DOMElements.betAmountInput.addEventListener('input', () => {
             const betInput = DOMElements.betAmountInput;
-            // Remove any character that is not a digit from 0-9
+            // Remove any character that is not a digit
             const cleanValue = betInput.value.replace(/[^0-9]/g, '');
-
-            // Update the field's value only if it has changed
             if (betInput.value !== cleanValue) {
                 betInput.value = cleanValue;
             }
