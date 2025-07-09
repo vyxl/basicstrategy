@@ -21,6 +21,7 @@
         .balance-positive { color: #48bb78; }
         .balance-negative { color: #e53e3e; }
         .balance-neutral { color: #e2e8f0; }
+        /* UI CHANGE: Reduced padding for a tighter fit. */
         .player-hand-wrapper { border: 2px solid transparent; padding: 0.5rem; border-radius: 0.75rem; transition: border-color 0.2s ease-in-out; }
         .player-hand-wrapper.active { border-color: #f6e05e; }
         .player-hand-wrapper.busted { border-color: #e53e3e; }
@@ -53,11 +54,6 @@
         }
         .hand-outcome-badge.push {
             background-color: #6b7280; /* gray-500 */
-        }
-
-        /* UI CHANGE: Added min-height to reserve space and prevent layout shifts. */
-        #player-hands-container {
-            min-height: 140px;
         }
 
         @media (max-width: 768px) {
@@ -118,6 +114,7 @@
         </div>
 
         <!-- Hands -->
+        <!-- UI CHANGE: Reduced bottom margin to bring hands closer together -->
         <div class="mb-2 text-center">
             <h2 class="text-2xl font-semibold mb-2">Dealer's Hand: <span id="dealer-score">0</span></h2>
             <div id="dealer-hand-container" class="card-container"></div>
@@ -149,7 +146,7 @@
     <script>
     // --- STATE & CONFIG ---
     let gameState = {};
-    const API_BASE_URL = 'http://127.0.0.1:5000'; // <-- REMEMBER TO CHANGE THIS URL
+    const API_BASE_URL = 'https://6ee6d7164154.ngrok-free.app'; // <-- REMEMBER TO CHANGE THIS URL
 
     // --- DOM ELEMENTS ---
     const DOMElements = {
