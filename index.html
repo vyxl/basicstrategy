@@ -321,6 +321,14 @@
         DOMElements.gameRulesHeader.addEventListener('click', () => {
             DOMElements.gameRulesContainer.classList.toggle('collapsed');
         });
+
+        DOMElements.betAmountInput.addEventListener('input', () => {
+            const betInput = DOMElements.betAmountInput;
+            // If the value includes a decimal, truncate it
+            if (betInput.value.includes('.')) {
+                betInput.value = Math.trunc(betInput.value);
+            }
+        });
     }
 
     // --- INITIALIZATION ---
