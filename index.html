@@ -45,34 +45,53 @@
             z-index: 10;
             border: 2px solid white;
         }
-        .hand-outcome-badge.win {
-            background-color: #22c55e; /* green-500 */
-        }
-        .hand-outcome-badge.loss {
-            background-color: #ef4444; /* red-500 */
-        }
-        .hand-outcome-badge.push {
-            background-color: #6b7280; /* gray-500 */
-        }
+        .hand-outcome-badge.win { background-color: #22c55e; }
+        .hand-outcome-badge.loss { background-color: #ef4444; }
+        .hand-outcome-badge.push { background-color: #6b7280; }
 
-        /* UI CHANGE: Added min-height to reserve space and prevent layout shifts. */
-        #player-hands-container {
-            min-height: 140px;
+        #player-hands-container { min-height: 140px; }
+
+        #game-rules-content {
+            overflow: hidden;
+            transition: max-height 0.5s ease-in-out, padding 0.5s ease-in-out;
+        }
+        #game-rules-container.collapsed #game-rules-content {
+            max-height: 0;
+            padding-top: 0;
+            padding-bottom: 0;
+            margin-top: 0;
+        }
+        #game-rules-container:not(.collapsed) #game-rules-content {
+            max-height: 500px; 
+        }
+        #game-rules-toggle-icon {
+            transition: transform 0.3s ease-in-out;
+        }
+        #game-rules-container.collapsed #game-rules-toggle-icon {
+            transform: rotate(-90deg);
         }
 
         @media (max-width: 768px) {
             h1 { font-size: 1.5rem; }
             .card { width: 50px; height: 75px; padding: 0.25rem; }
             .card-value { font-size: 1rem; }
-            #player-hands-container {
-                min-height: 120px; /* Adjust for smaller cards on mobile */
-            }
+            #player-hands-container { min-height: 120px; }
         }
     </style>
 </head>
 <body class="bg-gray-900 text-gray-100 flex flex-col items-center justify-center min-h-screen p-4">
     <div class="bg-gray-800 p-6 rounded-xl shadow-2xl max-w-4xl w-full">
         <h1 class="text-4xl font-bold text-center mb-6 text-yellow-400">Blackjack Basic Strategy Trainer</h1>
+
+        <!-- Game Rules Section - Content is now dynamically loaded -->
+        <div id="game-rules-container" class="text-center text-sm mb-8 p-3 rounded-lg bg-gray-700 border border-gray-600 cursor-pointer select-none collapsed">
+            <div id="game-rules-header" class="flex justify-center items-center gap-2 font-semibold text-blue-300">
+                <h3 class="text-lg">Game Rules</h3>
+                <span id="game-rules-toggle-icon">▼</span>
+            </div>
+            <!-- This div will be populated by the backend -->
+            <div id="game-rules-content" class="mt-2"></div>
+        </div>
 
         <!-- Controls & Shoe Display -->
         <div class="flex flex-col md:flex-row justify-center md:justify-around items-center gap-4 mb-6">
@@ -180,6 +199,10 @@
         adviceModalOverlay: document.getElementById('advice-modal-overlay'),
         modalAdviceText: document.getElementById('modal-advice-text'),
         modalCloseButton: document.getElementById('modal-close-button'),
+        gameRulesContainer: document.getElementById('game-rules-container'),
+        gameRulesHeader: document.getElementById('game-rules-header'),
+        // NEW: Reference to the content div for the rules
+        gameRulesContent: document.getElementById('game-rules-content'),
     };
 
     // --- UI UPDATE FUNCTIONS ---
@@ -190,6 +213,9 @@
             return;
         }
         
+        // Update game rules from backend
+        DOMElements.gameRulesContent.innerHTML = state.ui.gameRulesHtml;
+
         DOMElements.playerHandsContainer.innerHTML = state.ui.playerHandsHtml;
         DOMElements.dealerHandContainer.innerHTML = state.ui.dealerHandHtml;
         DOMElements.dealerScoreSpan.textContent = state.ui.dealerDisplayScore;
@@ -289,6 +315,10 @@
             if (event.target === DOMElements.adviceModalOverlay) {
                 hideAdviceModal();
             }
+        });
+
+        DOMElements.gameRulesHeader.addEventListener('click', () => {
+            DOMElements.gameRulesContainer.classList.toggle('collapsed');
         });
     }
 
