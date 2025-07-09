@@ -273,6 +273,13 @@
         DOMElements.adviceModalOverlay.classList.remove('show');
     }
 
+    function disableActionButtons() {
+        DOMElements.hitButton.disabled = true;
+        DOMElements.standButton.disabled = true;
+        DOMElements.doubleButton.disabled = true;
+        DOMElements.splitButton.disabled = true;
+    }    
+
     // --- API COMMUNICATION ---
     async function postRequest(endpoint, payload = {}) {
         payload.gameState = gameState;
@@ -300,22 +307,32 @@
     
     // --- EVENT LISTENERS ---
     function setupEventListeners() {
-        // ✅ UPDATED: Deal button logic now handles empty bets
         DOMElements.dealButton.addEventListener('click', () => {
             let betAmount = parseInt(DOMElements.betAmountInput.value);
-
-            // If the bet is invalid or empty, default to 10
             if (isNaN(betAmount) || betAmount < 1) {
                 betAmount = 10;
-                DOMElements.betAmountInput.value = '10'; // Update field to show the default
+                DOMElements.betAmountInput.value = '10';
             }
             postRequest('deal', { betAmount: betAmount });
         });
 
-        DOMElements.hitButton.addEventListener('click', () => postRequest('hit'));
-        DOMElements.standButton.addEventListener('click', () => postRequest('stand'));
-        DOMElements.doubleButton.addEventListener('click', () => postRequest('double'));
-        DOMElements.splitButton.addEventListener('click', () => postRequest('split'));
+        // ✅ UPDATED: Action buttons now disable immediately on click
+        DOMElements.hitButton.addEventListener('click', () => {
+            disableActionButtons();
+            postRequest('hit');
+        });
+        DOMElements.standButton.addEventListener('click', () => {
+            disableActionButtons();
+            postRequest('stand');
+        });
+        DOMElements.doubleButton.addEventListener('click', () => {
+            disableActionButtons();
+            postRequest('double');
+        });
+        DOMElements.splitButton.addEventListener('click', () => {
+            disableActionButtons();
+            postRequest('split');
+        });
         
         DOMElements.shoeSizeSelect.addEventListener('change', initializeGame);
         DOMElements.feedbackModeSelect.addEventListener('change', initializeGame);
@@ -331,18 +348,14 @@
             DOMElements.gameRulesContainer.classList.toggle('collapsed');
         });
 
-        // ✅ UPDATED: Input field now only allows digits
         DOMElements.betAmountInput.addEventListener('input', () => {
             const betInput = DOMElements.betAmountInput;
-            // Remove any character that is not a digit
             const cleanValue = betInput.value.replace(/[^0-9]/g, '');
-
             if (betInput.value !== cleanValue) {
                 betInput.value = cleanValue;
             }
         });
     }
-
     // --- INITIALIZATION ---
     async function initializeGame() {
         const shoeSize = parseInt(DOMElements.shoeSizeSelect.value);
