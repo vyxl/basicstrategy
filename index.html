@@ -324,11 +324,19 @@
 
         DOMElements.betAmountInput.addEventListener('input', () => {
             const betInput = DOMElements.betAmountInput;
-            // Remove any character that is not a digit (0-9)
-            const cleanValue = betInput.value.replace(/[^0-9]/g, '');
+            let value = betInput.value;
 
-            if (betInput.value !== cleanValue) {
+            // First, remove any non-numeric characters (except for a decimal)
+            // and then truncate the decimal part.
+            // This ensures "12.5" becomes "12" and "12a" also becomes "12".
+            const cleanValue = Math.trunc(parseFloat(value.replace(/[^0-9.]/g, '')));
+
+            // Update the input field only if the value has changed
+            // and it's a valid number.
+            if (!isNaN(cleanValue) && betInput.value != cleanValue) {
                 betInput.value = cleanValue;
+            } else if (isNaN(cleanValue)) {
+                betInput.value = ''; // Clear the field if input is invalid (e.g., just ".")
             }
         });
     }
