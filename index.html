@@ -324,9 +324,11 @@
 
         DOMElements.betAmountInput.addEventListener('input', () => {
             const betInput = DOMElements.betAmountInput;
-            // If the value includes a decimal, truncate it
-            if (betInput.value.includes('.')) {
-                betInput.value = Math.trunc(betInput.value);
+            // Remove any character that is not a digit (0-9)
+            const cleanValue = betInput.value.replace(/[^0-9]/g, '');
+
+            if (betInput.value !== cleanValue) {
+                betInput.value = cleanValue;
             }
         });
     }
